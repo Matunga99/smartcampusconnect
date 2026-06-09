@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0f172a"
+    android:padding="24dp">
+
+    <!-- Header info -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="SUOS LECTURER / STAFF COPTIC WORKSPACE"
+        android:textColor="#ef4444"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp"/>
+
+    <TextView
+        android:id="@+id/tv_lecturer_welcome"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Welcome Professor, Academic Core"
+        android:textColor="#ffffff"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="24dp"/>
+
+    <!-- Operational capabilities section -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Academic Department Context"
+            android:textColor="#94a3b8"
+            android:textSize="13sp"
+            android:layout_marginBottom="16dp"/>
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:backgroundTint="#1e293b"
+            android:layout_marginBottom="16dp">
+            
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tenant ID Registration Profile"
+                    android:textColor="#64748b"
+                    android:textSize="10sp"/>
+                <TextView
+                    android:id="@+id/tv_lecturer_school"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Loading Active Institutional Code..."
+                    android:textColor="#ffffff"
+                    android:textSize="14sp"
+                    android:layout_marginTop="4dp"
+                    android:textStyle="bold"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- Access Profile Panel directly -->
+        <Button
+            android:id="@+id/btn_lecturer_profile"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:text="@string/nav_profile"
+            android:backgroundTint="#4f46e5"
+            android:textColor="#ffffff"
+            android:layout_marginBottom="12dp" />
+
+    </LinearLayout>
+
+    <!-- Logout control -->
+    <Button
+        android:id="@+id/btn_lecturer_logout"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:text="@string/btn_logout"
+        android:backgroundTint="#ef4444"
+        android:textColor="#ffffff"/>
+
+</LinearLayout>

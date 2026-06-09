@@ -1,0 +1,12 @@
+{
+  "name": "Remix: Remix: Remix: Remix: Remix: Remix: Remix: Remix: SmartCampusConnect X",
+  "description": "Multi-tenant university and school management platform featuring isolated dashboards, academic years, semesters, levels, curriculum mapping, class groups, student course registration, lecturer teaching allocation, and timetable engine.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

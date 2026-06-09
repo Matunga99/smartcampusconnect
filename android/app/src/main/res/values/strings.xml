@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">SmartCampus Connect X</string>
+    <string name="api_url_hint">API Server URL (e.g., https://your-server.app)</string>
+    <string name="login_title">SUOS Identity Gateway</string>
+    <string name="email_hint">Email or Matriculation / Reg No.</string>
+    <string name="password_hint">Password</string>
+    <string name="btn_login">Authorize Session</string>
+    <string name="nav_profile">My Profile</string>
+    <string name="btn_save_changes">Save Profile changes</string>
+    <string name="btn_logout">Terminate Session (Logout)</string>
+</resources>

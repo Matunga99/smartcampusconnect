@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0f172a">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- Custom Header banner -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="#1e293b"
+            android:padding="24dp"
+            android:layout_marginBottom="24dp"
+            android:backgroundTint="#1e293b">
+
+            <de.hdodenhof.circleimageview.CircleImageView
+                android:id="@+id/profile_avatar"
+                android:layout_width="96dp"
+                android:layout_height="96dp"
+                android:src="@android:drawable/sym_def_app_icon"
+                app:civ_border_width="3dp"
+                app:civ_border_color="#4f46e5"/>
+
+            <TextView
+                android:id="@+id/profile_title_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="User Fullname"
+                android:textColor="#ffffff"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:layout_marginTop="12dp"/>
+
+            <TextView
+                android:id="@+id/profile_title_role"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="STUDENT"
+                android:textColor="#a855f7"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-black"
+                android:layout_marginTop="4dp"
+                android:background="#2e1065"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp"/>
+        </LinearLayout>
+
+        <!-- Status message -->
+        <TextView
+            android:id="@+id/profile_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#22c55e"
+            android:textSize="13dp"
+            android:gravity="center"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone"/>
+
+        <!-- Fields card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#1e293b"
+            android:padding="16dp"
+            android:elevation="4dp"
+            android:layout_marginBottom="24dp">
+
+            <!-- Read-only Legal name info -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="LEGAL ACCOUNT NAME"
+                android:textColor="#64748b"
+                android:textSize="10sp"
+                android:fontFamily="sans-serif-black"/>
+
+            <TextView
+                android:id="@+id/tv_legal_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Disabled Full Name"
+                android:textColor="#94a3b8"
+                android:textSize="15sp"
+                android:paddingTop="8dp"
+                android:paddingBottom="12dp"
+                android:textStyle="bold"/>
+
+            <!-- Email Address configuration -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:textColorHint="#64748b"
+                app:boxStrokeColor="#4f46e5"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_profile_email"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Authentication Email Address"
+                    android:textColor="#ffffff"
+                    android:inputType="textEmailAddress"
+                    android:textSize="14sp"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Tel configuration -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:textColorHint="#64748b"
+                app:boxStrokeColor="#4f46e5"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_profile_phone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Consolidated Telephone (Kenyan: 07XXXXXXXX)"
+                    android:textColor="#ffffff"
+                    android:inputType="phone"
+                    android:textSize="14sp"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Biological Gender Selector -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="BIOLOGICAL GENDER"
+                android:textColor="#64748b"
+                android:textSize="10sp"
+                android:fontFamily="sans-serif-black"
+                android:layout_marginBottom="6dp"/>
+
+            <Spinner
+                android:id="@+id/spinner_gender"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:backgroundTint="#ffffff"
+                android:layout_marginBottom="16dp"/>
+
+            <!-- Date of Birth config -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:textColorHint="#64748b"
+                app:boxStrokeColor="#4f46e5"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_profile_dob"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Date of Birth (YYYY-MM-DD)"
+                    android:textColor="#ffffff"
+                    android:inputType="date"
+                    android:textSize="14sp"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Current Address config -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:textColorHint="#64748b"
+                app:boxStrokeColor="#4f46e5"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_profile_address"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Residential Address (e.g. Nairobi, Kenya)"
+                    android:textColor="#ffffff"
+                    android:inputType="textPostalAddress"
+                    android:textSize="14sp"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Personal Biography description -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:textColorHint="#64748b"
+                app:boxStrokeColor="#4f46e5"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_profile_bio"
+                    android:layout_width="match_parent"
+                    android:layout_height="120dp"
+                    android:hint="Biography or academic focus summary"
+                    android:textColor="#ffffff"
+                    android:gravity="top|left"
+                    android:inputType="textMultiLine"
+                    android:textSize="14sp"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </LinearLayout>
+
+        <!-- Dynamic execution buttons -->
+        <Button
+            android:id="@+id/btn_save_profile"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="@string/btn_save_changes"
+            android:backgroundTint="#4f46e5"
+            android:textColor="#ffffff"
+            android:textStyle="bold"
+            app:cornerRadius="12dp"
+            android:layout_marginBottom="12dp"/>
+
+        <Button
+            android:id="@+id/btn_cancel_profile"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:text="Back to Dashboard"
+            android:backgroundTint="#334155"
+            android:textColor="#ffffff"
+            app:cornerRadius="12dp"/>
+
+    </LinearLayout>
+</ScrollView>
