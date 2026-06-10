@@ -110,6 +110,13 @@ export default function StudentDashboard({
   const [qrToken, setQrToken] = useState('');
   const [scanMessage, setScanMessage] = useState('');
 
+  // AI Study Assistant State
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiMessages, setAiMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiAdvisorLoading, setAiAdvisorLoading] = useState(false);
+  const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   // Profile Form Handling
   const handleEditProfileInit = () => {
     if (!dashboardData?.student) return;
@@ -311,6 +318,46 @@ export default function StudentDashboard({
     } catch (e) {
       setScanState('error');
       setScanMessage('Network failure during check-in');
+    }
+  };
+
+  const handleAiSend = async () => {
+    if (!aiQuery.trim() || aiLoading) return;
+    const userMsg = aiQuery.trim();
+    setAiMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setAiQuery('');
+    setAiLoading(true);
+    try {
+      const resp = await fetch('/api/ai/study-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ query: userMsg })
+      });
+      const data = await resp.json();
+      setAiMessages(prev => [...prev, { role: 'assistant', text: data.response || data.message || 'I can help with your studies. Please ask a specific question.' }]);
+    } catch (e) {
+      setAiMessages(prev => [...prev, { role: 'assistant', text: 'Sorry, I could not reach the AI engine. Please try again.' }]);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleGetAiAdvice = async () => {
+    setAiAdvisorLoading(true);
+    setAiAdvice(null);
+    try {
+      const resp = await fetch('/api/ai/advisor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ studentId: student?.id })
+      });
+      const data = await resp.json();
+      setAiAdvice(data.recommendations || data.message || 'Based on your academic profile, you are on track. Keep up attendance and prepare early for exams.');
+      appendLog?.('[AI] Academic advisor recommendations fetched.');
+    } catch (e) {
+      setAiAdvice('Advisor service temporarily unavailable. Please try again later.');
+    } finally {
+      setAiAdvisorLoading(false);
     }
   };
 
@@ -736,6 +783,71 @@ export default function StudentDashboard({
                      })}
                   </div>
                )}
+            </div>
+
+            {/* AI Study Assistant Widget */}
+            <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl border border-indigo-800/50 overflow-hidden shadow-lg">
+              <button onClick={() => setAiOpen(!aiOpen)}
+                className="w-full flex items-center justify-between px-5 py-4 text-white cursor-pointer hover:bg-indigo-800/20 transition">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-400 animate-pulse" />
+                  <span className="text-xs font-bold uppercase font-mono tracking-wider">AI Study Assistant</span>
+                  <span className="text-[9px] bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded-full font-bold">BETA</span>
+                </div>
+                <span className="text-slate-400 text-[10px]">{aiOpen ? '▲ Collapse' : '▼ Expand'}</span>
+              </button>
+              {aiOpen && (
+                <div className="px-5 pb-5 space-y-3">
+                  {/* Chat messages */}
+                  <div className="bg-slate-950/40 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
+                    {aiMessages.length === 0 && (
+                      <p className="text-[10px] text-slate-400 italic text-center py-4">Ask me anything about your courses, assignments, or academic advice.</p>
+                    )}
+                    {aiMessages.map((msg, i) => (
+                      <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[80%] px-3 py-2 rounded-xl text-[10px] leading-relaxed ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-200'}`}>
+                          {msg.text}
+                        </div>
+                      </div>
+                    ))}
+                    {aiLoading && (
+                      <div className="flex justify-start">
+                        <div className="bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-[10px]">
+                          <span className="animate-pulse">Thinking...</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {/* Input */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={aiQuery}
+                      onChange={e => setAiQuery(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleAiSend()}
+                      placeholder="e.g. Explain process scheduling in OS..."
+                      className="flex-1 bg-slate-800 border border-slate-700 text-white text-[10px] px-3 py-2 rounded-lg outline-none placeholder:text-slate-500 focus:border-indigo-500"
+                    />
+                    <button onClick={handleAiSend} disabled={aiLoading || !aiQuery.trim()}
+                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-bold cursor-pointer disabled:opacity-50 transition">
+                      Ask
+                    </button>
+                  </div>
+                  {/* Get AI Advice for Course Registration */}
+                  <div className="border-t border-indigo-800/40 pt-3">
+                    <button onClick={handleGetAiAdvice} disabled={aiAdvisorLoading}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-400/30 text-amber-300 rounded-xl text-[10px] font-bold uppercase tracking-wider transition cursor-pointer disabled:opacity-50">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      {aiAdvisorLoading ? 'Analyzing your profile...' : 'Get AI Academic Advisor Recommendations'}
+                    </button>
+                    {aiAdvice && (
+                      <div className="mt-2 bg-amber-950/30 border border-amber-800/30 rounded-xl p-3 text-[10px] text-amber-200 leading-relaxed">
+                        {aiAdvice}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

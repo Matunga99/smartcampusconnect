@@ -13,7 +13,28 @@ export interface School {
   enabledModules?: Record<string, boolean>;
 }
 
-export type UserRole = 'superadmin' | 'admin' | 'staff' | 'student';
+export type UserRole =
+  | 'superadmin'
+  | 'admin'
+  | 'staff'
+  | 'student'
+  | 'parent'
+  | 'sponsor'
+  | 'alumni'
+  | 'boardmember'
+  | 'registrar'
+  | 'bursar'
+  | 'accountant'
+  | 'hod'
+  | 'dean'
+  | 'principal'
+  | 'deputyprincipal'
+  | 'librarian'
+  | 'hostelmanager'
+  | 'transportmanager'
+  | 'hrofficer'
+  | 'procurementofficer'
+  | 'securityofficer';
 
 export interface User {
   id: string;
@@ -279,4 +300,203 @@ export interface Workflow {
   trigger: WorkflowTrigger;
   actions: WorkflowAction[];
   enabled: boolean;
+}
+
+// ─── Admissions ───────────────────────────────────────────────────────────────
+
+export type ApplicationStatus =
+  | 'submitted'
+  | 'under_review'
+  | 'shortlisted'
+  | 'interview_scheduled'
+  | 'admitted'
+  | 'rejected'
+  | 'waitlisted';
+
+export interface Application {
+  id: string;
+  schoolId: string;
+  intakeId?: string;
+  programId: string;
+  applicantName: string;
+  applicantEmail: string;
+  applicantPhone: string;
+  status: ApplicationStatus;
+  refNumber: string;
+  documents: string[];        // file names / URLs
+  entranceScore?: number;
+  interviewDate?: string;
+  interviewNotes?: string;
+  waitlistRank?: number;
+  admissionLetterUrl?: string;
+  submittedAt: string;
+  updatedAt: string;
+}
+
+// ─── Alumni ───────────────────────────────────────────────────────────────────
+
+export interface AlumniProfile {
+  id: string;
+  schoolId: string;
+  studentId: string;
+  userId?: string;
+  graduationYear: number;
+  programName: string;
+  currentEmployer?: string;
+  location?: string;
+  email: string;
+  linkedinUrl?: string;
+  isActivated: boolean;
+  activationToken?: string;
+  activationExpiry?: string;
+  createdAt: string;
+}
+
+export interface AlumniEvent {
+  id: string;
+  schoolId: string;
+  title: string;
+  date: string;
+  location: string;
+  description?: string;
+  capacity: number;
+  rsvpDeadline?: string;
+  rsvps: { userId: string; status: 'attending' | 'declined' }[];
+  createdAt: string;
+}
+
+export interface AlumniDonation {
+  id: string;
+  schoolId: string;
+  donorAlumniId: string;
+  donorName: string;
+  amount: number;
+  currency: string;
+  campaign: string;
+  status: 'pledged' | 'partially_paid' | 'fulfilled';
+  pledgeDate: string;
+  paidAmount?: number;
+}
+
+export interface AlumniJobPost {
+  id: string;
+  schoolId: string;
+  postedByAlumniId: string;
+  title: string;
+  company: string;
+  location: string;
+  description: string;
+  deadline: string;
+  isApproved: boolean;
+  createdAt: string;
+}
+
+// ─── AI Engine ────────────────────────────────────────────────────────────────
+
+export interface AIRiskScore {
+  id: string;
+  schoolId: string;
+  studentId: string;
+  studentName?: string;
+  studentReg?: string;
+  dropoutScore: number;       // 0–100
+  feeDefaultScore: number;    // 0–100
+  interventionFlag: boolean;
+  attendanceRate?: number;
+  cgpa?: number;
+  feeBalance?: number;
+  computedAt: string;
+}
+
+// ─── SIS Extensions ──────────────────────────────────────────────────────────
+
+export interface DisciplineRecord {
+  id: string;
+  schoolId: string;
+  studentId: string;
+  studentName?: string;
+  incidentDate: string;
+  type: string;
+  description: string;
+  actionTaken: string;
+  resolvedAt?: string;
+  createdBy?: string;
+}
+
+export interface MedicalRecord {
+  id: string;
+  schoolId: string;
+  studentId: string;
+  bloodType?: string;
+  allergies: string[];
+  conditions: string[];
+  visitDate: string;
+  complaint: string;
+  diagnosis: string;
+  treatment: string;
+  prescription?: string;
+  recordedBy?: string;
+}
+
+export interface StudentTransfer {
+  id: string;
+  schoolId: string;
+  studentId: string;
+  direction: 'in' | 'out';
+  fromInstitution: string;
+  toInstitution?: string;
+  transferDate: string;
+  academicStanding: string;
+  approvedBy?: string;
+}
+
+// ─── Country Framework ───────────────────────────────────────────────────────
+
+export interface PayrollDeduction {
+  name: string;
+  type: 'percentage' | 'fixed';
+  rate: number;
+  cap?: number;           // max annual amount
+  employeeShare: boolean;
+  employerShare: boolean;
+}
+
+export interface CountryFramework {
+  code: string;
+  name: string;
+  currency: string;
+  educationLevels: string[];
+  termStructure: string;        // e.g. "3 Terms" or "2 Semesters"
+  gradingScale: string;         // e.g. "A-E" or "4.0 GPA"
+  nationalExams: string[];
+  payrollDeductions: PayrollDeduction[];
+  regulatoryAuthority: string;
+}
+
+// ─── Security / Incidents ────────────────────────────────────────────────────
+
+export interface VisitorLog {
+  id: string;
+  schoolId: string;
+  visitorName: string;
+  visitorPhone?: string;
+  hostStudentId?: string;
+  hostStudentName?: string;
+  purpose: string;
+  checkInTime: string;
+  checkOutTime?: string;
+  recordedBy?: string;
+}
+
+export interface IncidentReport {
+  id: string;
+  schoolId: string;
+  reportedBy: string;
+  incidentType: string;
+  description: string;
+  location: string;
+  incidentDate: string;
+  status: 'open' | 'investigating' | 'resolved';
+  resolvedAt?: string;
+  resolution?: string;
 }

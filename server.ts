@@ -2625,6 +2625,35 @@ app.post('/api/admin/departments', requireRole(['admin']), (req, res) => {
   res.status(201).json(newDept);
 });
 
+app.put('/api/admin/departments/:id', requireRole(['admin']), (req, res) => {
+  const admin = (req as any).user;
+  const { id } = req.params;
+  const { name } = req.body;
+  if (!name) { res.status(400).json({ error: 'Department name is required' }); return; }
+  const db = readDb();
+  const idx = db.departments.findIndex((d: any) => d.id === id && d.schoolId === admin.schoolId);
+  if (idx === -1) { res.status(404).json({ error: 'Department not found' }); return; }
+  const conflict = db.departments.some((d: any) => d.schoolId === admin.schoolId && d.id !== id && d.name.toLowerCase().trim() === name.toLowerCase().trim());
+  if (conflict) { res.status(400).json({ error: `Department "${name}" already exists.` }); return; }
+  db.departments[idx] = { ...db.departments[idx], name: name.trim() };
+  writeDb(db);
+  res.json(db.departments[idx]);
+});
+
+app.delete('/api/admin/departments/:id', requireRole(['admin']), (req, res) => {
+  const admin = (req as any).user;
+  const { id } = req.params;
+  const db = readDb();
+  const idx = db.departments.findIndex((d: any) => d.id === id && d.schoolId === admin.schoolId);
+  if (idx === -1) { res.status(404).json({ error: 'Department not found' }); return; }
+  // Nullify references in programs and staff
+  db.programs = (db.programs || []).map((p: any) => p.departmentId === id ? { ...p, departmentId: '' } : p);
+  db.staff = (db.staff || []).map((s: any) => s.departmentIdHash === id ? { ...s, departmentIdHash: '' } : s);
+  db.departments.splice(idx, 1);
+  writeDb(db);
+  res.json({ message: 'Department deleted successfully.' });
+});
+
 // PROGRAMS
 app.get('/api/admin/programs', requireRole(['admin']), (req, res) => {
   const admin = (req as any).user;
@@ -15114,6 +15143,529 @@ if (process.env.NODE_ENV !== "production") {
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }
+
+// ─── Admissions Routes ────────────────────────────────────────────────────────
+
+app.post('/api/admissions/apply', (req, res) => {
+  const db = readDb();
+  const { schoolId, programId, applicantName, applicantEmail, applicantPhone, intakeId } = req.body;
+  if (!schoolId || !programId || !applicantName || !applicantEmail) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  const school = db.schools.find((s: any) => s.id === schoolId);
+  if (!school) return res.status(404).json({ error: 'Institution not found' });
+
+  const year = new Date().getFullYear();
+  const seq = Math.floor(10000 + Math.random() * 90000);
+  const refNumber = `APP-${school.code}-${year}-${seq}`;
+  const id = `app-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+
+  const application = {
+    id, schoolId, programId, intakeId: intakeId || null,
+    applicantName, applicantEmail, applicantPhone: applicantPhone || '',
+    status: 'submitted', refNumber, documents: [],
+    submittedAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+  };
+
+  if (!db.applications) db.applications = [];
+  db.applications.push(application);
+  writeDb(db);
+  res.status(201).json({ application, message: `Application submitted. Reference: ${refNumber}` });
+});
+
+app.get('/api/admissions', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const schoolId = user.role === 'superadmin' ? req.query.schoolId : user.schoolId;
+  const applications = (db.applications || []).filter((a: any) => a.schoolId === schoolId);
+  res.json(applications);
+});
+
+app.get('/api/admissions/stats', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const applications = (db.applications || []).filter((a: any) => a.schoolId === user.schoolId);
+  const counts: Record<string, number> = { submitted:0, under_review:0, shortlisted:0, interview_scheduled:0, admitted:0, rejected:0, waitlisted:0 };
+  for (const a of applications) { if (counts[a.status] !== undefined) counts[a.status]++; }
+  const conversionRate = applications.length > 0 ? Math.round((counts.admitted / applications.length) * 1000) / 10 : 0;
+  res.json({ ...counts, total: applications.length, conversionRate });
+});
+
+app.put('/api/admissions/:id/advance', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const { id } = req.params;
+  const { status, interviewDate, interviewNotes } = req.body;
+
+  const VALID: Record<string, string[]> = {
+    submitted: ['under_review','rejected'],
+    under_review: ['shortlisted','rejected'],
+    shortlisted: ['interview_scheduled','admitted','waitlisted','rejected'],
+    interview_scheduled: ['admitted','waitlisted','rejected'],
+    admitted: ['waitlisted'],
+    waitlisted: ['admitted','rejected'],
+    rejected: []
+  };
+
+  const idx = (db.applications || []).findIndex((a: any) => a.id === id && a.schoolId === user.schoolId);
+  if (idx === -1) return res.status(404).json({ error: 'Application not found' });
+
+  const app_obj = db.applications[idx];
+  if (!VALID[app_obj.status]?.includes(status)) {
+    return res.status(400).json({ error: `Invalid transition from ${app_obj.status} to ${status}` });
+  }
+
+  db.applications[idx] = { ...app_obj, status, interviewDate: interviewDate || app_obj.interviewDate, interviewNotes: interviewNotes || app_obj.interviewNotes, updatedAt: new Date().toISOString() };
+  writeDb(db);
+  res.json(db.applications[idx]);
+});
+
+app.post('/api/admissions/:id/enroll', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const { id } = req.params;
+
+  const appIdx = (db.applications || []).findIndex((a: any) => a.id === id && a.schoolId === user.schoolId);
+  if (appIdx === -1) return res.status(404).json({ error: 'Application not found' });
+
+  const appObj = db.applications[appIdx];
+  if (appObj.status !== 'admitted') return res.status(400).json({ error: 'Application must be admitted before enrollment' });
+
+  const program = db.programs.find((p: any) => p.id === appObj.programId);
+  const programCode = program?.code || 'STU';
+  const school = db.schools.find((s: any) => s.id === user.schoolId);
+  const existingCount = (db.students || []).filter((s: any) => s.schoolId === user.schoolId).length;
+  const seq = String(existingCount + 1).padStart(4, '0');
+  const year = new Date().getFullYear().toString().substr(2);
+  const month = new Date().toLocaleString('default', { month: 'short' }).toUpperCase();
+  const regNumber = `${programCode}/${seq}/${year}${month}`;
+
+  const studentId = `stu-${Date.now()}-${Math.random().toString(36).substr(2,4)}`;
+  const student = {
+    id: studentId, schoolId: user.schoolId,
+    name: appObj.applicantName, email: appObj.applicantEmail, phone: appObj.applicantPhone,
+    regNumber, programId: appObj.programId, yearOfStudy: 1,
+    status: 'active', academicState: 'ADMITTED', intakeId: appObj.intakeId || null,
+    createdAt: new Date().toISOString()
+  };
+
+  if (!db.students) db.students = [];
+  db.students.push(student);
+  db.applications[appIdx].status = 'waitlisted'; // Mark as enrolled
+  db.applications[appIdx].updatedAt = new Date().toISOString();
+
+  // Fire workflow event
+  if (!db.events) db.events = [];
+  db.events.push({ id: `evt-${Date.now()}`, eventType: 'student_admitted', schoolId: user.schoolId, timestamp: new Date().toISOString(), metadata: { studentId, regNumber } });
+
+  writeDb(db);
+  res.status(201).json({ student, message: `Student enrolled. Registration: ${regNumber}` });
+});
+
+// ─── Alumni Routes ────────────────────────────────────────────────────────────
+
+app.get('/api/alumni/me', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const profile = (db.alumniProfiles || []).find((a: any) => a.userId === user.id || a.email === user.email);
+  if (!profile) return res.status(404).json({ error: 'Alumni profile not found' });
+  res.json(profile);
+});
+
+app.put('/api/alumni/me', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const { currentEmployer, location, linkedinUrl } = req.body;
+  const idx = (db.alumniProfiles || []).findIndex((a: any) => a.userId === user.id || a.email === user.email);
+  if (idx === -1) return res.status(404).json({ error: 'Alumni profile not found' });
+  if (linkedinUrl && !/^https?:\/\//.test(linkedinUrl)) return res.status(400).json({ error: 'Invalid LinkedIn URL format' });
+  if (currentEmployer && currentEmployer.length > 200) return res.status(400).json({ error: 'Employer name exceeds 200 characters' });
+  db.alumniProfiles[idx] = { ...db.alumniProfiles[idx], currentEmployer, location, linkedinUrl, updatedAt: new Date().toISOString() };
+  writeDb(db);
+  res.json(db.alumniProfiles[idx]);
+});
+
+app.get('/api/alumni', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const profiles = (db.alumniProfiles || []).filter((a: any) => a.schoolId === user.schoolId);
+  res.json(profiles);
+});
+
+app.get('/api/alumni/events', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const events = (db.alumniEvents || []).filter((e: any) => e.schoolId === user.schoolId);
+  res.json(events);
+});
+
+app.post('/api/alumni/events', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  if (!['admin','superadmin'].includes(user.role)) return res.status(403).json({ error: 'Forbidden' });
+  const { title, date, location, description, capacity, rsvpDeadline } = req.body;
+  if (!title || !date || !location || !capacity) return res.status(400).json({ error: 'Missing required fields' });
+  const event = { id: `event-${Date.now()}`, schoolId: user.schoolId, title, date, location, description: description || '', capacity: Number(capacity), rsvpDeadline: rsvpDeadline || null, rsvps: [], createdAt: new Date().toISOString() };
+  if (!db.alumniEvents) db.alumniEvents = [];
+  db.alumniEvents.push(event);
+  writeDb(db);
+  res.status(201).json(event);
+});
+
+app.post('/api/alumni/events/:id/rsvp', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const { id } = req.params;
+  const { status } = req.body;
+  if (!['attending','declined'].includes(status)) return res.status(400).json({ error: 'Invalid RSVP status' });
+  const idx = (db.alumniEvents || []).findIndex((e: any) => e.id === id && e.schoolId === user.schoolId);
+  if (idx === -1) return res.status(404).json({ error: 'Event not found' });
+  const event = db.alumniEvents[idx];
+  const rsvpIdx = event.rsvps.findIndex((r: any) => r.userId === user.id);
+  if (rsvpIdx > -1) event.rsvps[rsvpIdx].status = status;
+  else event.rsvps.push({ userId: user.id, status });
+  db.alumniEvents[idx] = event;
+  writeDb(db);
+  res.json({ success: true, status });
+});
+
+app.get('/api/alumni/jobs', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const jobs = (db.alumniJobs || []).filter((j: any) => j.schoolId === user.schoolId && j.isApproved);
+  res.json(jobs);
+});
+
+app.post('/api/alumni/jobs', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  if (!['alumni','admin'].includes(user.role)) return res.status(403).json({ error: 'Only alumni can post jobs' });
+  const { title, company, location, description, deadline } = req.body;
+  if (!title || !company || !description) return res.status(400).json({ error: 'Missing required fields' });
+  const job = { id: `job-${Date.now()}`, schoolId: user.schoolId, postedByAlumniId: user.id, title, company, location: location || '', description, deadline: deadline || null, isApproved: user.role === 'admin', createdAt: new Date().toISOString() };
+  if (!db.alumniJobs) db.alumniJobs = [];
+  db.alumniJobs.push(job);
+  writeDb(db);
+  res.status(201).json(job);
+});
+
+app.get('/api/alumni/network', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const myProfile = (db.alumniProfiles || []).find((a: any) => a.userId === user.id || a.email === user.email);
+  if (!myProfile) return res.json([]);
+  const cohort = (db.alumniProfiles || []).filter((a: any) =>
+    a.schoolId === user.schoolId &&
+    a.id !== myProfile.id &&
+    (a.graduationYear === myProfile.graduationYear || a.programName === myProfile.programName)
+  ).slice(0, 20);
+  res.json(cohort);
+});
+
+app.get('/api/alumni/donations', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const donations = (db.alumniDonations || []).filter((d: any) => d.schoolId === user.schoolId);
+  res.json(donations);
+});
+
+// ─── AI Engine Routes ────────────────────────────────────────────────────────
+
+app.post('/api/ai/compute-risks', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  if (!['admin','superadmin','hod','dean','principal'].includes(user.role)) return res.status(403).json({ error: 'Forbidden' });
+
+  const students = (db.students || []).filter((s: any) => s.schoolId === user.schoolId && (s.status === 'active' || s.status === 'Active'));
+  const registrations = (db.courseRegistrations || []).filter((r: any) => r.schoolId === user.schoolId);
+  const scores: any[] = [];
+
+  for (const student of students) {
+    const regs = registrations.filter((r: any) => r.studentId === student.id);
+    const grades = regs.map((r: any) => {
+      const g = r.grade || '';
+      if (g === 'A') return 85; if (g === 'B') return 72; if (g === 'C') return 62;
+      if (g === 'D') return 52; if (g === 'E' || g === 'F') return 35; return 0;
+    }).filter((g: number) => g > 0);
+    const avgGrade = grades.length > 0 ? grades.reduce((a: number, b: number) => a + b, 0) / grades.length : 50;
+    const attendanceRate = regs.length > 0 ? regs.reduce((s: number, r: any) => s + (r.totalClasses > 0 ? (r.attendanceCount || 0) / r.totalClasses * 100 : 75), 0) / regs.length : 75;
+
+    let dropoutScore = 0;
+    if (attendanceRate < 50) dropoutScore += 35;
+    else if (attendanceRate < 65) dropoutScore += 25;
+    else if (attendanceRate < 75) dropoutScore += 15;
+    if (avgGrade < 40) dropoutScore += 30;
+    else if (avgGrade < 55) dropoutScore += 20;
+    else if (avgGrade < 65) dropoutScore += 10;
+    dropoutScore = Math.min(100, dropoutScore);
+
+    const feeDefaultScore = Math.floor(20 + Math.random() * 40); // placeholder — replace with real fee data
+
+    scores.push({
+      id: `risk-${student.id}`, schoolId: user.schoolId, studentId: student.id,
+      studentName: student.name, studentReg: student.regNumber,
+      dropoutScore, feeDefaultScore, interventionFlag: dropoutScore >= 55,
+      attendanceRate: Math.round(attendanceRate), computedAt: new Date().toISOString()
+    });
+  }
+
+  if (!db.aiRiskScores) db.aiRiskScores = [];
+  for (const score of scores) {
+    const existingIdx = db.aiRiskScores.findIndex((s: any) => s.studentId === score.studentId);
+    if (existingIdx > -1) db.aiRiskScores[existingIdx] = score;
+    else db.aiRiskScores.push(score);
+  }
+  writeDb(db);
+  res.json({ computed: scores.length, scores: scores.slice(0, 20) });
+});
+
+app.get('/api/ai/risks', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const scores = (db.aiRiskScores || []).filter((s: any) => s.schoolId === user.schoolId);
+  res.json(scores);
+});
+
+app.post('/api/ai/study-assistant', requireAuth, (req, res) => {
+  const { query } = req.body;
+  if (!query) return res.status(400).json({ error: 'Query is required' });
+  const RESPONSES = [
+    { pattern: /assignment|homework|due/i, response: 'Check your Assignments tab in the LMS for all pending tasks and due dates.' },
+    { pattern: /timetable|schedule|class|when/i, response: 'Your current timetable is available under the Timetable tab in your dashboard.' },
+    { pattern: /grade|result|gpa|cgpa|mark/i, response: 'Your grades and GPA are viewable in the Results portal under each semester.' },
+    { pattern: /fee|payment|invoice|balance/i, response: 'Check your Finance portal for your fee statement and outstanding balance.' },
+    { pattern: /register|unit|course|enroll/i, response: 'Unit registration opens at the start of each semester via the Registration tab.' },
+    { pattern: /attendance|absent|present/i, response: 'Your attendance is tracked via QR scan in class. You need at least 75% to sit exams.' },
+    { pattern: /library|book|borrow/i, response: 'Browse and borrow books from the Library portal. Digital resources are also available.' },
+    { pattern: /health|sick|clinic|doctor/i, response: 'Visit the campus clinic for medical assistance. Emergency contacts are available 24/7.' },
+  ];
+  for (const { pattern, response } of RESPONSES) {
+    if (pattern.test(query)) return res.json({ response });
+  }
+  res.json({ response: 'I can help with assignments, timetables, grades, fees, registration, attendance, library, and campus services. Please rephrase your question.' });
+});
+
+app.post('/api/ai/advisor', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const student = (db.students || []).find((s: any) => s.userId === user.id || s.email === user.email);
+  if (!student) return res.status(404).json({ error: 'Student record not found' });
+
+  const regs = (db.courseRegistrations || []).filter((r: any) => r.studentId === student.id);
+  const completedUnitIds = regs.filter((r: any) => r.grade && r.grade !== '' && r.grade !== 'PENDING').map((r: any) => r.unitId);
+  const curriculum = (db.programCurriculum || []).filter((c: any) => c.programId === student.programId && c.schoolId === user.schoolId);
+
+  const recommendations = curriculum
+    .filter((c: any) => !completedUnitIds.includes(c.unitId))
+    .slice(0, 5)
+    .map((c: any) => ({ unitId: c.unitId, unitCode: c.unitCode || c.unitName?.split(' ')[0], unitName: c.unitName || c.unitId, priority: c.unitType === 'Core' ? 'required' : 'elective', reason: c.unitType === 'Core' ? 'Core unit required for graduation' : 'Elective — choose based on career interest' }));
+
+  res.json({ recommendations });
+});
+
+app.get('/api/ai/timetable-suggestions', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const timetables = (db.timetables || []).filter((t: any) => t.schoolId === user.schoolId);
+  const slotMap = new Map<string, any[]>();
+
+  for (const t of timetables) {
+    const key = `${t.staffId}|${t.day}|${t.timeSlot}`;
+    if (!slotMap.has(key)) slotMap.set(key, []);
+    slotMap.get(key)!.push(t);
+  }
+
+  const conflicts: any[] = [];
+  const suggestions: any[] = [];
+  for (const [, group] of slotMap) {
+    if (group.length > 1) {
+      conflicts.push({ day: group[0].day, timeSlot: group[0].timeSlot, staffName: group[0].staffName || group[0].staffId });
+      suggestions.push({ type: 'CONFLICT', message: `Conflict: ${group.map((g: any) => g.unitName || g.unitId).join(' / ')} on ${group[0].day} ${group[0].timeSlot} — move one unit to an adjacent free slot.` });
+    }
+  }
+
+  const utilization = timetables.length > 0 ? Math.min(100, Math.round((timetables.length / Math.max(timetables.length + 5, 1)) * 100)) : 0;
+
+  if (utilization < 60) {
+    suggestions.push({ type: 'UTILIZATION', message: `Timetable utilization is at ${utilization}%. Consider scheduling more units during underused periods.` });
+  }
+
+  res.json({ totalSlots: timetables.length, conflicts, suggestions, utilizationRate: utilization });
+});
+
+// ─── AI Attendance Predictions ────────────────────────────────────────────────
+
+app.get('/api/ai/attendance-predictions', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const registrations = (db.course_registrations || []).filter((r: any) => r.schoolId === user.schoolId);
+  const units = (db.units || []).filter((u: any) => u.schoolId === user.schoolId);
+  const attendanceRecords = (db.attendance_records || []).filter((a: any) => a.schoolId === user.schoolId);
+
+  // Build per-unit attendance stats
+  const unitMap = new Map<string, { unitId: string; unitCode: string; unitName: string; total: number; present: number }>();
+
+  for (const u of units) {
+    unitMap.set(u.id, { unitId: u.id, unitCode: u.code, unitName: u.name, total: 0, present: 0 });
+  }
+
+  for (const rec of attendanceRecords) {
+    if (unitMap.has(rec.unitId)) {
+      const entry = unitMap.get(rec.unitId)!;
+      entry.total++;
+      if (rec.status === 'present' || rec.status === 'Present') entry.present++;
+    }
+  }
+
+  const predictions = Array.from(unitMap.values())
+    .filter(u => u.total > 0 || registrations.some((r: any) => r.unitId === u.unitId))
+    .map(u => {
+      const currentRate = u.total > 0 ? Math.round((u.present / u.total) * 100) : 85;
+      // Simple linear trend: if current < threshold predict further decline, else slight improvement
+      const trend = currentRate < 75 ? -3 : 2;
+      const predictedRate = Math.max(0, Math.min(100, currentRate + trend));
+      return {
+        unitId: u.unitId,
+        unitCode: u.unitCode,
+        unitName: u.unitName,
+        currentRate,
+        predictedRate,
+        trend: trend > 0 ? '↑ Improving' : '↓ Declining',
+      };
+    });
+
+  res.json(predictions);
+});
+
+// ─── SIS Extension Routes ────────────────────────────────────────────────────
+
+app.get('/api/sis/:studentId/medical', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const { studentId } = req.params;
+  const records = (db.medicalRecords || []).filter((r: any) => r.studentId === studentId && r.schoolId === user.schoolId);
+  res.json(records);
+});
+
+app.post('/api/sis/:studentId/medical', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const { studentId } = req.params;
+  if (!['admin','superadmin'].includes(user.role)) return res.status(403).json({ error: 'Forbidden' });
+  const record = { id: `med-${Date.now()}`, schoolId: user.schoolId, studentId, ...req.body, recordedBy: user.name || user.email, createdAt: new Date().toISOString() };
+  if (!db.medicalRecords) db.medicalRecords = [];
+  db.medicalRecords.push(record);
+  writeDb(db);
+  res.status(201).json(record);
+});
+
+app.get('/api/sis/discipline', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const records = (db.disciplineRecords || []).filter((r: any) => r.schoolId === user.schoolId);
+  res.json(records);
+});
+
+app.get('/api/sis/:studentId/discipline', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const { studentId } = req.params;
+  const records = (db.disciplineRecords || []).filter((r: any) => r.studentId === studentId && r.schoolId === user.schoolId);
+  res.json(records);
+});
+
+app.post('/api/sis/:studentId/discipline', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const { studentId } = req.params;
+  const student = (db.students || []).find((s: any) => s.id === studentId && s.schoolId === user.schoolId);
+  const record = { id: `disc-${Date.now()}`, schoolId: user.schoolId, studentId, studentName: student?.name, ...req.body, createdBy: user.name || user.email, createdAt: new Date().toISOString() };
+  if (!db.disciplineRecords) db.disciplineRecords = [];
+  db.disciplineRecords.push(record);
+  writeDb(db);
+  res.status(201).json(record);
+});
+
+app.get('/api/sis/:studentId/transfers', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const { studentId } = req.params;
+  const records = (db.studentTransfers || []).filter((r: any) => r.studentId === studentId && r.schoolId === user.schoolId);
+  res.json(records);
+});
+
+app.post('/api/sis/:studentId/transfers', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const { studentId } = req.params;
+  if (!['admin','superadmin','registrar'].includes(user.role)) return res.status(403).json({ error: 'Forbidden' });
+  const record = { id: `trans-${Date.now()}`, schoolId: user.schoolId, studentId, ...req.body, approvedBy: user.name, createdAt: new Date().toISOString() };
+  if (!db.studentTransfers) db.studentTransfers = [];
+  db.studentTransfers.push(record);
+  writeDb(db);
+  res.status(201).json(record);
+});
+
+// ─── Security Routes ─────────────────────────────────────────────────────────
+
+app.get('/api/security/visitors', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const visitors = (db.visitorLogs || []).filter((v: any) => v.schoolId === user.schoolId);
+  res.json(visitors);
+});
+
+app.post('/api/security/visitors', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const visitor = { id: `vis-${Date.now()}`, schoolId: user.schoolId, recordedBy: user.name || user.email, ...req.body };
+  if (!db.visitorLogs) db.visitorLogs = [];
+  db.visitorLogs.push(visitor);
+  writeDb(db);
+  res.status(201).json(visitor);
+});
+
+app.put('/api/security/visitors/:id/checkout', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const { id } = req.params;
+  const idx = (db.visitorLogs || []).findIndex((v: any) => v.id === id && v.schoolId === user.schoolId);
+  if (idx === -1) return res.status(404).json({ error: 'Visitor log not found' });
+  db.visitorLogs[idx] = { ...db.visitorLogs[idx], checkOutTime: req.body.checkOutTime || new Date().toISOString() };
+  writeDb(db);
+  res.json(db.visitorLogs[idx]);
+});
+
+app.get('/api/security/incidents', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const incidents = (db.incidentReports || []).filter((i: any) => i.schoolId === user.schoolId);
+  res.json(incidents);
+});
+
+app.post('/api/security/incidents', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = req.user;
+  const incident = { id: `inc-${Date.now()}`, schoolId: user.schoolId, reportedBy: user.name || user.email, ...req.body, createdAt: new Date().toISOString() };
+  if (!db.incidentReports) db.incidentReports = [];
+  db.incidentReports.push(incident);
+  writeDb(db);
+  res.status(201).json(incident);
+});
+
+// ─── Country Framework Routes ────────────────────────────────────────────────
+
+app.get('/api/country-frameworks', requireAuth, (req, res) => {
+  const FRAMEWORKS = [
+    { code: 'KE', name: 'Kenya', currency: 'KES', termStructure: '3 Terms', nationalExams: ['KCPE','KCSE'], regulatoryAuthority: 'MOE / KNEC', educationLevels: ['Grade 1-6','Grade 7-9','Grade 10-12','Certificate','Diploma','Bachelor','Masters','PhD'] },
+    { code: 'UG', name: 'Uganda', currency: 'UGX', termStructure: '3 Terms', nationalExams: ['PLE','UCE','UACE'], regulatoryAuthority: 'UNEB', educationLevels: ['Primary 1-7','S1-S4 (UCE)','S5-S6 (UACE)','Certificate','Diploma','Bachelor','Masters','PhD'] },
+    { code: 'TZ', name: 'Tanzania', currency: 'TZS', termStructure: '3 Terms', nationalExams: ['PSLE','CSEE','ACSEE'], regulatoryAuthority: 'NECTA', educationLevels: ['Standard 1-7','Form 1-4','Form 5-6','Certificate','Diploma','Bachelor','Masters','PhD'] },
+    { code: 'RW', name: 'Rwanda', currency: 'RWF', termStructure: '3 Terms', nationalExams: ['PLE','NSC','A-Level'], regulatoryAuthority: 'REB / HEC', educationLevels: ['P1-P6','S1-S3','S4-S6','Certificate','Diploma','Bachelor','Masters','PhD'] },
+    { code: 'NG', name: 'Nigeria', currency: 'NGN', termStructure: '3 Terms', nationalExams: ['BECE','WAEC SSCE','JAMB UTME'], regulatoryAuthority: 'NUC / NBTE', educationLevels: ['Primary 1-6','JSS 1-3','SSS 1-3','ND','HND','Bachelor','Masters','PhD'] },
+    { code: 'ZA', name: 'South Africa', currency: 'ZAR', termStructure: '4 Terms', nationalExams: ['NSC Matric','NC(V)'], regulatoryAuthority: 'DBE / DHET / Umalusi', educationLevels: ['Grade R-7','Grade 8-9','Grade 10-12','Higher Certificate','Diploma','Bachelor','Honours','Masters','PhD'] },
+  ];
+  res.json(FRAMEWORKS);
+});
 
 // Start Server
 app.listen(PORT, "0.0.0.0", () => {

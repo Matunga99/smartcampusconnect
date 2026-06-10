@@ -71,6 +71,9 @@ import AdminTemplateLibrary from './AdminTemplateLibrary';
 import AdminDynamicEntities from './AdminDynamicEntities';
 import AdminWorkflowEngine from './AdminWorkflowEngine';
 import AdminMarketplace from './AdminMarketplace';
+import AdminAdmissionsEngine from './AdminAdmissionsEngine';
+import AdminAlumniManagement from './AdminAlumniManagement';
+import AdminAIEngine from './AdminAIEngine';
 
 interface SchoolAdminDashboardProps {
   token: string;
@@ -103,7 +106,7 @@ export default function SchoolAdminDashboard({
     return defaultVal;
   };
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'departments' | 'programs' | 'units' | 'staff' | 'students' | 'parents' | 'settings' | 'timeline' | 'curriculum' | 'allocation' | 'timetable' | 'state_machine' | 'system_control' | 'communications' | 'finance' | 'library' | 'campus_life' | 'hr_management' | 'procurement_assets' | 'system_health' | 'module_manager' | 'template_library' | 'dynamic_entities' | 'workflow_engine' | 'marketplace' | 'profile'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'departments' | 'programs' | 'units' | 'staff' | 'students' | 'parents' | 'settings' | 'timeline' | 'curriculum' | 'allocation' | 'timetable' | 'state_machine' | 'system_control' | 'communications' | 'finance' | 'library' | 'campus_life' | 'hr_management' | 'procurement_assets' | 'system_health' | 'module_manager' | 'template_library' | 'dynamic_entities' | 'workflow_engine' | 'marketplace' | 'profile' | 'admissions' | 'alumni' | 'ai_engine'>('dashboard');
   const [enrolledStudentCredentials, setEnrolledStudentCredentials] = useState<any | null>(null);
   const [schoolData, setSchoolData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -325,6 +328,15 @@ export default function SchoolAdminDashboard({
 
   // Edit states for students
   const [editingStudent, setEditingStudent] = useState<any | null>(null);
+
+  // SIS Extension state
+  const [sisStudentId, setSisStudentId] = useState<string | null>(null);
+  const [sisStudentName, setSisStudentName] = useState<string>('');
+  const [sisTab, setSisTab] = useState<'medical' | 'discipline' | 'transfers'>('medical');
+  const [sisData, setSisData] = useState<any[]>([]);
+  const [sisLoading, setSisLoading] = useState(false);
+  const [sisForm, setSisForm] = useState<Record<string, any>>({});
+  const [sisSaving, setSisSaving] = useState(false);
 
   // Modals visibility toggles
   const [showAddDeptModal, setShowAddDeptModal] = useState(false);
@@ -1646,8 +1658,49 @@ export default function SchoolAdminDashboard({
                 <span className="truncate">Phase 11.7: Real Document Engine</span>
               </button>
 
-              <div className="px-3 pt-6 pb-2">
-                <p className="text-slate-500 text-[10px] uppercase font-bold tracking-widest font-mono font-bold">System Config</p>
+              {isModuleActive('admissions', true) && (
+                <button
+                  id="school-admissions-tab"
+                  onClick={() => { setActiveTab('admissions'); setError(null); }}
+                  className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded transition-colors text-xs font-semibold cursor-pointer border border-violet-500/20 mt-1 ${
+                    activeTab === 'admissions'
+                      ? 'bg-violet-600 text-white shadow-sm'
+                      : 'bg-violet-900/20 text-violet-400 hover:text-white hover:bg-slate-800/40'
+                  }`}
+                >
+                  <GraduationCap className="h-4.5 w-4.5 opacity-90" />
+                  <span className="truncate">Admissions Engine</span>
+                </button>
+              )}
+
+              <button
+                id="school-alumni-tab"
+                onClick={() => { setActiveTab('alumni'); setError(null); }}
+                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded transition-colors text-xs font-semibold cursor-pointer border border-amber-500/20 mt-1 ${
+                  activeTab === 'alumni'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'bg-amber-900/20 text-amber-400 hover:text-white hover:bg-slate-800/40'
+                }`}
+              >
+                <Users className="h-4.5 w-4.5 opacity-90" />
+                <span className="truncate">Alumni Management</span>
+              </button>
+
+              <button
+                id="school-ai-engine-tab"
+                onClick={() => { setActiveTab('ai_engine'); setError(null); }}
+                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded transition-colors text-xs font-semibold cursor-pointer border border-indigo-400/30 mt-1 ${
+                  activeTab === 'ai_engine'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-indigo-950/30 text-indigo-300 hover:text-white hover:bg-slate-800/40'
+                }`}
+              >
+                <Sparkles className="h-4.5 w-4.5 opacity-90" />
+                <span className="truncate">AI Engine</span>
+              </button>
+
+              <div className="px-3 pt-4 pb-2">
+                <p className="text-slate-500 text-[10px] uppercase font-bold tracking-widest font-mono">System Config</p>
               </div>
 
               <button
@@ -2299,6 +2352,22 @@ export default function SchoolAdminDashboard({
                                     >
                                       <Trash2 className="h-4 w-4" />
                                     </button>
+                                    <button
+                                      onClick={async () => {
+                                        setSisStudentId(st.id);
+                                        setSisStudentName(st.name);
+                                        setSisTab('medical');
+                                        setSisLoading(true);
+                                        try {
+                                          const res = await fetch(`/api/sis/${st.id}/medical`, { headers: { 'Authorization': `Bearer ${token}` } });
+                                          if (res.ok) setSisData(await res.json());
+                                        } finally { setSisLoading(false); }
+                                      }}
+                                      className="p-1.5 hover:bg-teal-50 border border-slate-150 text-teal-600 hover:text-teal-800 transition-all rounded-lg cursor-pointer"
+                                      title="SIS Records (Medical, Discipline, Transfers)"
+                                    >
+                                      <HeartPulse className="h-4 w-4" />
+                                    </button>
                                   </div>
                                 </td>
                               </tr>
@@ -2314,6 +2383,160 @@ export default function SchoolAdminDashboard({
               {/* TAB 6.5: GENERAL PARENTS / GUARDIANS WORLD */}
               {activeTab === 'parents' && (
                 <AdminParentManagement token={token} appendLog={appendLog} />
+              )}
+
+              {/* SIS PANEL MODAL — Medical, Discipline, Transfers + Promote/Graduate */}
+              {sisStudentId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => { setSisStudentId(null); setSisData([]); }} />
+                  <div className="relative z-10 bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[80vh] flex flex-col">
+                    {/* SIS Header */}
+                    <div className="bg-slate-900 text-white rounded-t-2xl p-5 flex justify-between items-start shrink-0">
+                      <div>
+                        <p className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">SIS Extended Records</p>
+                        <h4 className="font-bold text-sm mt-0.5">{sisStudentName}</h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Promote ${sisStudentName} to next academic year?`)) return;
+                            const res = await fetch(`/api/admin/students/${sisStudentId}`, {
+                              method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                              body: JSON.stringify({ yearOfStudy: (students.find(s => s.id === sisStudentId)?.yearOfStudy || 1) + 1 })
+                            });
+                            if (res.ok) { setSuccessMsg('Student promoted to next year.'); setTimeout(() => setSuccessMsg(null), 3000); loadSchoolRecords(); }
+                          }}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition cursor-pointer"
+                        >
+                          Promote
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Mark ${sisStudentName} as Graduated?`)) return;
+                            const res = await fetch(`/api/admin/students/${sisStudentId}`, {
+                              method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                              body: JSON.stringify({ status: 'Graduated', academicState: 'GRADUATED' })
+                            });
+                            if (res.ok) { setSuccessMsg('Student graduated successfully.'); setTimeout(() => setSuccessMsg(null), 3000); loadSchoolRecords(); }
+                          }}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition cursor-pointer"
+                        >
+                          Graduate
+                        </button>
+                        <button onClick={() => { setSisStudentId(null); setSisData([]); }} className="p-1.5 text-slate-300 hover:text-white transition cursor-pointer">
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* SIS Sub Tabs */}
+                    <div className="flex gap-1 bg-slate-50 border-b border-slate-200 px-4 py-2 shrink-0">
+                      {(['medical', 'discipline', 'transfers'] as const).map(tab => (
+                        <button key={tab} onClick={async () => {
+                          setSisTab(tab);
+                          setSisLoading(true);
+                          setSisData([]);
+                          try {
+                            const res = await fetch(`/api/sis/${sisStudentId}/${tab}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                            if (res.ok) setSisData(await res.json());
+                          } finally { setSisLoading(false); }
+                        }}
+                          className={`px-4 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer capitalize ${sisTab === tab ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>
+                          {tab}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* SIS Body */}
+                    <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                      {sisLoading ? (
+                        <div className="flex justify-center py-10"><RefreshCw className="h-5 w-5 animate-spin text-indigo-500" /></div>
+                      ) : (
+                        <>
+                          {sisData.length === 0 && (
+                            <div className="text-center py-8 text-slate-400 text-sm italic">No {sisTab} records found for this student.</div>
+                          )}
+                          {sisData.map((rec: any, i: number) => (
+                            <div key={i} className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-1.5">
+                              {Object.entries(rec).filter(([k]) => !['id','schoolId','studentId'].includes(k)).map(([k, v]) => (
+                                <div key={k} className="flex justify-between gap-4">
+                                  <span className="text-slate-400 font-mono capitalize">{k.replace(/([A-Z])/g, ' $1').toLowerCase()}</span>
+                                  <span className="font-medium text-slate-700 text-right">{Array.isArray(v) ? v.join(', ') : String(v || '—')}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+
+                          {/* Quick Add Form */}
+                          <div className="bg-white border border-slate-200 rounded-xl p-4">
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono mb-3">Add {sisTab} Record</p>
+                            {sisTab === 'medical' && (
+                              <div className="space-y-2">
+                                <div className="grid grid-cols-2 gap-2">
+                                  {[['complaint','Chief Complaint'],['diagnosis','Diagnosis'],['treatment','Treatment'],['prescription','Prescription (opt.)']].map(([field, label]) => (
+                                    <div key={field}>
+                                      <label className="block text-[9px] text-slate-400 font-bold uppercase mb-1">{label}</label>
+                                      <input type="text" value={sisForm[field] || ''} onChange={e => setSisForm(prev => ({ ...prev, [field]: e.target.value }))}
+                                        className="w-full py-1.5 px-2 border border-slate-200 rounded text-xs outline-none" placeholder={label} />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {sisTab === 'discipline' && (
+                              <div className="space-y-2">
+                                <div className="grid grid-cols-2 gap-2">
+                                  {[['type','Incident Type'],['description','Description'],['actionTaken','Action Taken']].map(([field, label]) => (
+                                    <div key={field} className={field === 'description' || field === 'actionTaken' ? 'col-span-2' : ''}>
+                                      <label className="block text-[9px] text-slate-400 font-bold uppercase mb-1">{label}</label>
+                                      <input type="text" value={sisForm[field] || ''} onChange={e => setSisForm(prev => ({ ...prev, [field]: e.target.value }))}
+                                        className="w-full py-1.5 px-2 border border-slate-200 rounded text-xs outline-none" placeholder={label} />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {sisTab === 'transfers' && (
+                              <div className="space-y-2">
+                                <div className="grid grid-cols-2 gap-2">
+                                  {[['fromInstitution','From Institution'],['direction','Direction (in/out)'],['academicStanding','Academic Standing'],['transferDate','Transfer Date']].map(([field, label]) => (
+                                    <div key={field}>
+                                      <label className="block text-[9px] text-slate-400 font-bold uppercase mb-1">{label}</label>
+                                      <input type={field === 'transferDate' ? 'date' : 'text'} value={sisForm[field] || ''} onChange={e => setSisForm(prev => ({ ...prev, [field]: e.target.value }))}
+                                        className="w-full py-1.5 px-2 border border-slate-200 rounded text-xs outline-none" placeholder={label} />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            <button
+                              disabled={sisSaving}
+                              onClick={async () => {
+                                setSisSaving(true);
+                                const payload = { ...sisForm, incidentDate: new Date().toISOString(), visitDate: new Date().toISOString() };
+                                try {
+                                  const res = await fetch(`/api/sis/${sisStudentId}/${sisTab}`, {
+                                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                    body: JSON.stringify(payload)
+                                  });
+                                  if (res.ok) {
+                                    const data = await res.json();
+                                    setSisData(prev => [...prev, data]);
+                                    setSisForm({});
+                                    appendLog?.(`[SIS] Added ${sisTab} record for ${sisStudentName}`);
+                                  }
+                                } finally { setSisSaving(false); }
+                              }}
+                              className="mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                            >
+                              {sisSaving ? 'Saving...' : `Save ${sisTab.charAt(0).toUpperCase() + sisTab.slice(1)} Record`}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* TAB 7: SETTINGS / PREFERENCES */}
@@ -3903,6 +4126,21 @@ export default function SchoolAdminDashboard({
                 <div className="max-w-4xl bg-white rounded-2xl p-6 border border-slate-200">
                   <ProfilePage token={token} user={user} appendLog={appendLog} />
                 </div>
+              )}
+
+              {/* TAB 20: ADMISSIONS ENGINE */}
+              {activeTab === 'admissions' && (
+                <AdminAdmissionsEngine token={token} appendLog={appendLog} />
+              )}
+
+              {/* TAB 21: ALUMNI MANAGEMENT */}
+              {activeTab === 'alumni' && (
+                <AdminAlumniManagement token={token} appendLog={appendLog} />
+              )}
+
+              {/* TAB 22: AI ENGINE */}
+              {activeTab === 'ai_engine' && (
+                <AdminAIEngine token={token} appendLog={appendLog} />
               )}
             </>
           )}

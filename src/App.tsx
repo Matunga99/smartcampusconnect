@@ -11,6 +11,15 @@ import StudentDashboard from './components/StudentDashboard';
 import LecturerDashboard from './components/LecturerDashboard';
 import ParentDashboard from './components/ParentDashboard';
 import SponsorDashboard from './components/SponsorDashboard';
+import RegistrarDashboard from './components/RegistrarDashboard';
+import BursarDashboard from './components/BursarDashboard';
+import HODDashboard from './components/HODDashboard';
+import DeanDashboard from './components/DeanDashboard';
+import PrincipalDashboard from './components/PrincipalDashboard';
+import DeputyPrincipalDashboard from './components/DeputyPrincipalDashboard';
+import BoardMemberDashboard from './components/BoardMemberDashboard';
+import SecurityOfficerDashboard from './components/SecurityOfficerDashboard';
+import AlumniDashboard from './components/AlumniDashboard';
 import PublicWebsiteEngine from './components/PublicWebsiteEngine';
 import SchoolPublicWebsite from './components/SchoolPublicWebsite';
 import ThemeToggle from './components/ThemeToggle';
@@ -308,19 +317,77 @@ export default function App() {
         isPhoneFrame={false}
       />
     );
+  } else if (normalizedRole === 'registrar') {
+    mainContent = (
+      <RegistrarDashboard token={token} user={normalizedUser} onLogout={handleLogout} appendLog={appendLog} />
+    );
+  } else if (normalizedRole === 'bursar' || normalizedRole === 'accountant') {
+    mainContent = (
+      <BursarDashboard token={token} user={normalizedUser} onLogout={handleLogout} appendLog={appendLog} />
+    );
+  } else if (normalizedRole === 'hod') {
+    mainContent = (
+      <HODDashboard token={token} user={normalizedUser} onLogout={handleLogout} appendLog={appendLog} />
+    );
+  } else if (normalizedRole === 'dean') {
+    mainContent = (
+      <DeanDashboard token={token} user={normalizedUser} onLogout={handleLogout} appendLog={appendLog} />
+    );
+  } else if (normalizedRole === 'principal') {
+    mainContent = (
+      <PrincipalDashboard token={token} user={normalizedUser} onLogout={handleLogout} appendLog={appendLog} />
+    );
+  } else if (normalizedRole === 'deputyprincipal') {
+    mainContent = (
+      <DeputyPrincipalDashboard token={token} user={normalizedUser} onLogout={handleLogout} appendLog={appendLog} />
+    );
+  } else if (normalizedRole === 'boardmember') {
+    mainContent = (
+      <BoardMemberDashboard token={token} user={normalizedUser} onLogout={handleLogout} appendLog={appendLog} />
+    );
+  } else if (normalizedRole === 'securityofficer') {
+    mainContent = (
+      <SecurityOfficerDashboard token={token} user={normalizedUser} onLogout={handleLogout} appendLog={appendLog} />
+    );
+  } else if (normalizedRole === 'alumni') {
+    mainContent = (
+      <AlumniDashboard token={token} user={normalizedUser} onLogout={handleLogout} appendLog={appendLog} />
+    );
+  } else if (
+    normalizedRole === 'librarian' ||
+    normalizedRole === 'hostelmanager' ||
+    normalizedRole === 'transportmanager' ||
+    normalizedRole === 'hrofficer' ||
+    normalizedRole === 'procurementofficer'
+  ) {
+    // These roles access the School Admin dashboard with scoped modules
+    mainContent = (
+      <SchoolAdminDashboard
+        token={token}
+        user={{ ...normalizedUser, scopedRole: normalizedRole }}
+        onLogout={handleLogout}
+        appendLog={appendLog}
+        isPhoneFrame={false}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          appendLog(`[DEBUG] Scoped role tab: "${tab}"`);
+        }}
+      />
+    );
   } else {
     mainContent = (
-      <div className="flex flex-col items-center justify-center p-6 text-center h-full">
-        <div className="p-3 bg-indigo-50 border border-indigo-150 text-indigo-600 rounded-full mb-3">
+      <div className="flex flex-col items-center justify-center p-6 text-center h-screen">
+        <div className="p-3 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-full mb-3">
           <ShieldCheck className="h-5 w-5" />
         </div>
-        <h4 className="font-bold text-slate-900 text-sm">Custom Portal</h4>
-        <p className="text-[10px] text-slate-500 mt-1 max-w-[240px]">
-          Logged in as {user.email}. Portals will be unlocked shortly.
+        <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">Portal Coming Soon</h4>
+        <p className="text-[11px] text-slate-500 mt-1 max-w-[260px]">
+          Logged in as <span className="font-medium">{normalizedUser.name}</span> ({normalizedRole || 'unknown role'}).
+          Your dedicated portal is being set up.
         </p>
         <button
           onClick={handleLogout}
-          className="mt-4 px-3.5 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold cursor-pointer"
+          className="mt-4 px-3.5 py-1.5 bg-slate-900 dark:bg-slate-700 text-white rounded text-xs font-semibold cursor-pointer"
         >
           Sign Out
         </button>
