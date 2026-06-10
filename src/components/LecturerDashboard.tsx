@@ -39,11 +39,43 @@ export default function LecturerDashboard({
   const [showQRBroadcast, setShowQRBroadcast] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string|null>(null);
   const [activeQrToken, setActiveQrToken] = useState<string>('');
+  const [qrExpiresAt, setQrExpiresAt] = useState<number>(0);
+  const [qrSecondsLeft, setQrSecondsLeft] = useState<number>(60);
   const [selectedUnitId, setSelectedUnitId] = useState<string>('');
   const [sessionPresentIds, setSessionPresentIds] = useState<Record<string, boolean>>({});
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [submittingGradeForRegId, setSubmittingGradeForRegId] = useState<string>('');
   const [gradeStatusMap, setGradeStatusMap] = useState<Record<string, string>>({});
+
+  // ── QR auto-rotate countdown ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!showQRBroadcast || !activeSessionId) return;
+
+    const tick = setInterval(async () => {
+      const now = Date.now();
+      const left = Math.max(0, Math.ceil((qrExpiresAt - now) / 1000));
+      setQrSecondsLeft(left);
+
+      // Auto-rotate when token is about to expire
+      if (left <= 3 && activeSessionId) {
+        try {
+          const res = await fetch(`/api/lecturer/attendance/sessions/${activeSessionId}/rotate-qr`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setActiveQrToken(data.qrToken || data.newQrToken);
+            setQrExpiresAt(Date.now() + (data.durationSeconds || 60) * 1000);
+            setQrSecondsLeft(data.durationSeconds || 60);
+            appendLog?.('[QR] Token rotated — new beacon active.');
+          }
+        } catch { /* silently continue */ }
+      }
+    }, 1000);
+
+    return () => clearInterval(tick);
+  }, [showQRBroadcast, activeSessionId, qrExpiresAt, token, appendLog]);
 
   // Load lecturer context & classes
   useEffect(() => {
@@ -159,6 +191,8 @@ export default function LecturerDashboard({
         const { session, qrToken } = await resp.json();
         setActiveSessionId(session.id);
         setActiveQrToken(qrToken);
+        setQrExpiresAt(Date.now() + (session.qrDurationSeconds || 60) * 1000);
+        setQrSecondsLeft(session.qrDurationSeconds || 60);
         setShowQRBroadcast(true);
         appendLog?.(`[PORTAL] Attendance session started. Beacon token generated.`);
       }
@@ -579,29 +613,87 @@ export default function LecturerDashboard({
                </div>
             </div>
 
-            {/* Simulated Live Attendance QR Broadcast Screen */}
+            {/* Live QR Attendance Broadcast Panel */}
             {showQRBroadcast && (
-               <div className="bg-gradient-to-br from-teal-950 to-slate-900 border border-teal-500/30 rounded-3xl p-4 text-center space-y-3 animate-fade-in text-white shadow-xl max-w-sm mx-auto">
-                 <span className="text-[8px] uppercase font-mono tracking-widest text-teal-400 font-black block">Active QR Beacon Broadcast</span>
-                 <h4 className="text-[11px] font-bold">Class Token Validation</h4>
-                 
-                 {/* Visual QR Code Generator Simulation */}
-                 <div className="w-48 h-48 bg-white p-2.5 rounded-2xl mx-auto flex items-center justify-center border-4 border-teal-500 shadow-md">
+               <div className="bg-gradient-to-br from-teal-950 to-slate-900 border border-teal-500/30 rounded-3xl p-5 text-center space-y-3 animate-fade-in text-white shadow-xl max-w-sm mx-auto">
+                 {/* Header */}
+                 <div className="flex items-center justify-between">
+                   <span className="text-[8px] uppercase font-mono tracking-widest text-teal-400 font-black">⬤ LIVE — QR Beacon Active</span>
+                   <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${qrSecondsLeft <= 10 ? 'bg-red-900/60 text-red-300 animate-pulse' : 'bg-teal-900/60 text-teal-300'}`}>
+                     {qrSecondsLeft}s
+                   </span>
+                 </div>
+
+                 <h4 className="text-[11px] font-bold">
+                   {data?.assignments?.find((a: any) => a.unitId === selectedUnitId)?.unitCode || 'Session'} — Attendance QR
+                 </h4>
+
+                 {/* QR Code — full scannable image */}
+                 <div className="w-52 h-52 bg-white p-3 rounded-2xl mx-auto flex items-center justify-center border-4 border-teal-500 shadow-md relative">
                    {activeQrToken ? (
-                     <QRCodeSVG value={activeQrToken} size={160} level="H" />
+                     <QRCodeSVG
+                       value={JSON.stringify({ sessionId: activeSessionId, qrToken: activeQrToken })}
+                       size={172}
+                       level="H"
+                       includeMargin={false}
+                     />
                    ) : (
-                     <div className="w-full h-full bg-slate-900 flex items-center justify-center overflow-hidden flex-col gap-1 p-2 rounded-xl">
-                       <span className="text-white text-xs font-mono">WAITING...</span>
+                     <div className="flex flex-col items-center gap-2 text-slate-400">
+                       <RefreshCw className="h-8 w-8 animate-spin text-teal-400" />
+                       <span className="text-xs font-mono">Generating...</span>
+                     </div>
+                   )}
+                   {/* Expiry overlay when about to rotate */}
+                   {qrSecondsLeft <= 5 && (
+                     <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center">
+                       <span className="text-red-400 font-mono font-black text-2xl animate-pulse">{qrSecondsLeft}</span>
                      </div>
                    )}
                  </div>
 
-                 <p className="text-[9px] text-slate-350 max-w-xs mx-auto leading-relaxed">
-                   Students can point their camera at this QR code or type <strong className="text-teal-400">{activeQrToken}</strong> directly to register attendance. Code expires when session ends.
+                 {/* Token display */}
+                 <div className="text-[8px] bg-teal-900/30 font-mono py-1.5 rounded-lg border border-teal-800/50 px-3 break-all max-w-[260px] mx-auto">
+                   Token: <span className="text-teal-300 font-bold">{activeQrToken || '—'}</span>
+                 </div>
+
+                 <p className="text-[9px] text-slate-400 max-w-xs mx-auto leading-relaxed">
+                   Students scan this QR or enter the token in the student portal. Auto-rotates every 60s for security.
                  </p>
-                 
-                 <div className="text-[8px] bg-teal-900/30 font-mono py-1 rounded border border-teal-800/50 inline-block px-3 break-all max-w-[250px] truncate">
-                   Session ID: {activeSessionId || 'Starting...'}
+
+                 {/* Session ID */}
+                 <div className="text-[8px] text-slate-500 font-mono">
+                   Session: {activeSessionId || 'Initialising...'}
+                 </div>
+
+                 {/* Action buttons */}
+                 <div className="flex gap-2 justify-center pt-1">
+                   <button
+                     onClick={async () => {
+                       if (!activeSessionId) return;
+                       try {
+                         const res = await fetch(`/api/lecturer/attendance/sessions/${activeSessionId}/rotate-qr`, {
+                           method: 'POST',
+                           headers: { 'Authorization': `Bearer ${token}` }
+                         });
+                         if (res.ok) {
+                           const d = await res.json();
+                           setActiveQrToken(d.qrToken || d.newQrToken);
+                           setQrExpiresAt(Date.now() + (d.durationSeconds || 60) * 1000);
+                           setQrSecondsLeft(d.durationSeconds || 60);
+                           appendLog?.('[QR] Manual rotation triggered.');
+                         }
+                       } catch { /* silent */ }
+                     }}
+                     className="py-1.5 px-3 bg-teal-700 hover:bg-teal-600 text-white rounded-xl text-[9px] font-mono font-bold flex items-center gap-1 cursor-pointer transition-all"
+                   >
+                     <RefreshCw className="h-3 w-3" /> Rotate Now
+                   </button>
+                   <button
+                     onClick={handleStopSession}
+                     className="py-1.5 px-3 bg-red-700 hover:bg-red-600 text-white rounded-xl text-[9px] font-mono font-bold cursor-pointer transition-all"
+                   >
+                     End Session
+                   </button>
                  </div>
                </div>
             )}

@@ -86,28 +86,71 @@ export default function DocumentEnginePortal() {
   const [verificationResult, setVerificationResult] = useState<MockDocument | null>(null);
   const [searched, setSearched] = useState(false);
 
-  // Active document list synced to localStorage
+  // Active document list — persisted to backend API
   const [documentRegistry, setDocumentRegistry] = useState<MockDocument[]>([]);
+  const [token] = useState<string>(() => localStorage.getItem('scc_token') || '');
 
+  // Load documents from backend on mount, fallback to seeded data
   useEffect(() => {
-    const stored = localStorage.getItem('scc_verifiable_docs');
-    if (stored) {
+    const loadDocs = async () => {
+      if (!token) {
+        setDocumentRegistry(SEEDED_DOCUMENTS);
+        return;
+      }
       try {
-        setDocumentRegistry(JSON.parse(stored));
-      } catch (e) {
+        const res = await fetch('/api/documents', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Map backend docs to MockDocument shape, merge with seeded
+          const backendDocs: MockDocument[] = (data || []).map((d: any) => ({
+            code: d.metadata?.code || d.id,
+            studentName: d.metadata?.studentName || '',
+            admissionNo: d.metadata?.admissionNo || '',
+            program: d.metadata?.program || '',
+            gpa: d.metadata?.gpa || '',
+            gradDate: d.metadata?.gradDate || '',
+            docType: d.type || 'Document',
+            verified: d.metadata?.verified !== false,
+            issuedOn: d.createdAt ? new Date(d.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
+          }));
+          // Merge: backend first, then seeded as fallback entries
+          const merged = [...backendDocs];
+          SEEDED_DOCUMENTS.forEach(sd => {
+            if (!merged.find(d => d.code === sd.code)) merged.push(sd);
+          });
+          setDocumentRegistry(merged);
+        } else {
+          setDocumentRegistry(SEEDED_DOCUMENTS);
+        }
+      } catch {
         setDocumentRegistry(SEEDED_DOCUMENTS);
       }
-    } else {
-      localStorage.setItem('scc_verifiable_docs', JSON.stringify(SEEDED_DOCUMENTS));
-      setDocumentRegistry(SEEDED_DOCUMENTS);
-    }
-  }, []);
+    };
+    loadDocs();
+  }, [token]);
 
-  const saveToGlobalRegistry = (doc: MockDocument) => {
+  const saveToGlobalRegistry = async (doc: MockDocument) => {
     const updated = [doc, ...documentRegistry.filter(d => d.code !== doc.code)];
     setDocumentRegistry(updated);
-    localStorage.setItem('scc_verifiable_docs', JSON.stringify(updated));
-    // Also post custom event to sync with other components like public website
+    // Persist to backend
+    if (token) {
+      try {
+        await fetch('/api/documents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({
+            title: `${doc.docType} — ${doc.studentName}`,
+            type: doc.docType.toLowerCase().replace(/\s+/g, '_'),
+            content: '',
+            metadata: { ...doc }
+          })
+        });
+      } catch { /* best-effort save */ }
+    }
+    // Keep localStorage as offline cache
+    try { localStorage.setItem('scc_verifiable_docs', JSON.stringify(updated)); } catch { /* ignore */ }
     window.dispatchEvent(new Event('scc_registry_updated'));
   };
 

@@ -304,6 +304,132 @@ public class DashboardModels {
         }
     }
 
+    // ── Attendance session models ─────────────────────────────────────────────
+
+    public static class AttendanceSession {
+        public String id;
+        public String unitId;
+        public String unitCode;
+        public String unitName;
+        public String sessionDate;
+        public String status;
+        public String currentQrToken;
+        public String qrExpiresAt;
+        public int presentCount;
+        public int totalStudents;
+    }
+
+    public static class StartSessionRequest {
+        @SerializedName("unitId")  public String unitId;
+        @SerializedName("cohortId") public String cohortId;
+        @SerializedName("venue")   public String venue;
+
+        public StartSessionRequest(String unitId, String cohortId, String venue) {
+            this.unitId = unitId;
+            this.cohortId = cohortId;
+            this.venue = venue;
+        }
+    }
+
+    public static class StartSessionResponse {
+        public AttendanceSession session;
+        public String qrToken;
+        public int durationSeconds;
+    }
+
+    public static class RotateQrResponse {
+        public String qrToken;
+        public String newQrToken;
+        public int durationSeconds;
+    }
+
+    // ── School update request ─────────────────────────────────────────────────
+
+    public static class UpdateSchoolRequest {
+        @SerializedName("name")            public String name;
+        @SerializedName("email")           public String email;
+        @SerializedName("phone")           public String phone;
+        @SerializedName("institutionType") public String institutionType;
+
+        public UpdateSchoolRequest(String name, String email, String phone, String institutionType) {
+            this.name = name;
+            this.email = email;
+            this.phone = phone;
+            this.institutionType = institutionType;
+        }
+    }
+
+    // ── HOD dashboard ─────────────────────────────────────────────────────────
+
+    public static class HodDashboard {
+        public Department department;
+        public int staffCount;
+        public int programCount;
+        public int studentCount;
+        public List<Staff> staff;
+        public List<Program> programs;
+        public List<Announcement> announcements;
+    }
+
+    // ── Admissions ────────────────────────────────────────────────────────────
+
+    public static class Admission {
+        public String id;
+        public String applicantName;
+        public String applicantEmail;
+        public String applicantPhone;
+        public String programId;
+        public String status;
+        public String refNumber;
+        public String submittedAt;
+        public String updatedAt;
+    }
+
+    public static class AdmissionsStats {
+        public int total;
+        public int submitted;
+        public int admitted;
+        public int rejected;
+        public int underReview;
+    }
+
+    // ── Research ──────────────────────────────────────────────────────────────
+
+    public static class ResearchSummary {
+        public List<ResearchProject> projects;
+        public List<Publication> publications;
+    }
+
+    public static class ResearchProject {
+        public String id;
+        public String title;
+        public String fundingAgency;
+        public double grantAmount;
+        public String status;
+        public String startDate;
+        public String endDate;
+    }
+
+    public static class Publication {
+        public String id;
+        public String title;
+        public String journalName;
+        public String publishedDate;
+        public int citationCount;
+        public String authorName;
+    }
+
+    // ── Documents ─────────────────────────────────────────────────────────────
+
+    public static class Document {
+        public String id;
+        public String title;
+        public String type;
+        public String status;
+        public String createdAt;
+        public String updatedAt;
+    }
+
     // ── Generic response wrapper ─────────────────────────────────────────────
 
     public static class GenericResponse {

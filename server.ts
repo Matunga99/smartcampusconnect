@@ -13,6 +13,64 @@ import { randomBytes } from 'crypto';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
+import webpush from 'web-push';
+import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
+// ── Web Push (VAPID) setup ────────────────────────────────────────────────────
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || 'mailto:admin@smartcampus.app',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
+
+// ── Email transport (SMTP / Nodemailer) ───────────────────────────────────────
+function createMailTransport() {
+  if (!process.env.SMTP_HOST) return null;
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: Number(process.env.SMTP_PORT) === 465,
+    auth: {
+      user: process.env.SMTP_USER || '',
+      pass: process.env.SMTP_PASS || ''
+    }
+  });
+}
+
+/**
+ * Send an email. Silently fails if SMTP not configured.
+ */
+async function sendEmail(to: string, subject: string, html: string) {
+  const transport = createMailTransport();
+  if (!transport) return;
+  try {
+    await transport.sendMail({
+      from: process.env.SMTP_FROM || 'noreply@smartcampus.app',
+      to,
+      subject,
+      html
+    });
+  } catch (e) {
+    console.warn('[EMAIL] Failed to send email:', e);
+  }
+}
+
+/**
+ * Send a Web Push notification to a subscription endpoint.
+ * Silently fails if VAPID not configured.
+ */
+async function sendPushNotification(subscription: any, payload: { title: string; body: string; url?: string }) {
+  if (!process.env.VAPID_PUBLIC_KEY) return;
+  try {
+    await webpush.sendNotification(subscription, JSON.stringify(payload));
+  } catch (e) {
+    console.warn('[PUSH] Failed to send push notification:', e);
+  }
+}
 
 declare global {
   namespace Express {
@@ -1111,7 +1169,8 @@ function readDb() {
       'devices', 'software_licenses', 'network_assets', 'server_assets',
       'buildings', 'facility_rooms', 'maintenance_requests', 'maintenance_tasks', 'maintenance_work_orders',
       'vehicle_assignments', 'fuel_logs', 'service_logs', 'driver_assignments',
-      'asset_audits', 'stock_audits', 'procurement_audits', 'user_profiles', 'school_websites'
+      'asset_audits', 'stock_audits', 'procurement_audits', 'user_profiles', 'school_websites',
+      'push_subscriptions', 'user_documents'
     ];
     for (const key of collections) {
       if (!db[key]) {
@@ -16300,6 +16359,71 @@ app.get('/api/hod/dashboard', requireAuth, (req, res) => {
     studentCount: deptStudents.length,
     announcements: (db.announcements || []).filter((a: any) => a.schoolId === schoolId).slice(-5).reverse()
   });
+});
+
+/* ============================================================
+   PUSH NOTIFICATIONS & EMAIL ENDPOINTS
+   ============================================================ */
+
+// Subscribe a browser to push notifications
+app.post('/api/push/subscribe', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const { subscription } = req.body;
+  if (!subscription || !subscription.endpoint) {
+    res.status(400).json({ error: 'subscription object required' });
+    return;
+  }
+  if (!db.push_subscriptions) db.push_subscriptions = [];
+  // Upsert by endpoint
+  const idx = db.push_subscriptions.findIndex((s: any) => s.endpoint === subscription.endpoint);
+  const entry = { userId: user.id, schoolId: user.schoolId, ...subscription };
+  if (idx !== -1) db.push_subscriptions[idx] = entry;
+  else db.push_subscriptions.push(entry);
+  writeDb(db);
+  res.status(201).json({ message: 'Push subscription registered' });
+});
+
+// Get VAPID public key (needed by frontend to subscribe)
+app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || null });
+});
+
+// Send push to all users in a school (admin/superadmin only)
+app.post('/api/push/broadcast', requireAuth, async (req, res) => {
+  const user = (req as any).user;
+  if (!['admin', 'superadmin'].includes(user.role)) {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+  const db = readDb();
+  const { title, body, url } = req.body;
+  if (!title || !body) { res.status(400).json({ error: 'title and body required' }); return; }
+
+  const subs = (db.push_subscriptions || []).filter((s: any) =>
+    user.role === 'superadmin' || s.schoolId === user.schoolId
+  );
+
+  let sent = 0;
+  for (const sub of subs) {
+    await sendPushNotification(sub, { title, body, url: url || '/' });
+    sent++;
+  }
+
+  res.json({ message: `Push notification sent to ${sent} subscribers` });
+});
+
+// Send email (admin/superadmin only)
+app.post('/api/email/send', requireAuth, async (req, res) => {
+  const user = (req as any).user;
+  if (!['admin', 'superadmin'].includes(user.role)) {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+  const { to, subject, html } = req.body;
+  if (!to || !subject) { res.status(400).json({ error: 'to and subject required' }); return; }
+  await sendEmail(to, subject, html || subject);
+  res.json({ message: `Email dispatched to ${to}` });
 });
 
 // Start Server

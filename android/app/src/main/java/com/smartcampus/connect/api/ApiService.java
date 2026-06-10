@@ -57,12 +57,25 @@ public interface ApiService {
     @GET("api/admin/timetables")
     Call<List<DashboardModels.TimetableEntry>> getTimetables(@Header("Authorization") String auth);
 
-    // ── Finance ───────────────────────────────────────────────────────────────
-    @GET("api/finance/invoices")
-    Call<List<DashboardModels.Invoice>> getInvoices(@Header("Authorization") String auth);
+    // ── Lecturer attendance sessions ──────────────────────────────────────────
+    @GET("api/lecturer/attendance/sessions")
+    Call<List<DashboardModels.AttendanceSession>> getAttendanceSessions(
+            @Header("Authorization") String auth);
 
-    @GET("api/finance/summary")
-    Call<DashboardModels.FinanceSummary> getFinanceSummary(@Header("Authorization") String auth);
+    @POST("api/lecturer/attendance/sessions")
+    Call<DashboardModels.StartSessionResponse> startAttendanceSession(
+            @Header("Authorization") String auth,
+            @Body DashboardModels.StartSessionRequest request);
+
+    @POST("api/lecturer/attendance/sessions/{id}/rotate-qr")
+    Call<DashboardModels.RotateQrResponse> rotateQr(
+            @Header("Authorization") String auth,
+            @Path("id") String sessionId);
+
+    @POST("api/lecturer/attendance/sessions/{id}/end")
+    Call<DashboardModels.GenericResponse> endAttendanceSession(
+            @Header("Authorization") String auth,
+            @Path("id") String sessionId);
 
     // ── Library ───────────────────────────────────────────────────────────────
     @GET("api/library/books")
@@ -73,6 +86,16 @@ public interface ApiService {
 
     @GET("api/library/fines")
     Call<List<DashboardModels.LibraryFine>> getLibraryFines(@Header("Authorization") String auth);
+
+    // ── Finance ───────────────────────────────────────────────────────────────
+    @GET("api/finance/invoices")
+    Call<List<DashboardModels.Invoice>> getInvoices(@Header("Authorization") String auth);
+
+    @GET("api/finance/summary")
+    Call<DashboardModels.FinanceSummary> getFinanceSummary(@Header("Authorization") String auth);
+
+    @GET("api/finance/student-balances")
+    Call<List<DashboardModels.StudentBalance>> getStudentBalances(@Header("Authorization") String auth);
 
     // ── Announcements ─────────────────────────────────────────────────────────
     @GET("api/communications/announcements")
@@ -160,6 +183,12 @@ public interface ApiService {
     @GET("api/super/schools")
     Call<List<DashboardModels.School>> getSchools(@Header("Authorization") String auth);
 
+    @PUT("api/super/schools/{id}")
+    Call<DashboardModels.School> updateSchool(
+            @Header("Authorization") String auth,
+            @Path("id") String schoolId,
+            @Body DashboardModels.UpdateSchoolRequest request);
+
     @POST("api/super/schools/{id}/toggle")
     Call<DashboardModels.GenericResponse> toggleSchool(
             @Header("Authorization") String auth,
@@ -167,4 +196,54 @@ public interface ApiService {
 
     @GET("api/super/admins")
     Call<List<DashboardModels.AdminUser>> getAdmins(@Header("Authorization") String auth);
+
+    @DELETE("api/super/admins/{id}")
+    Call<DashboardModels.GenericResponse> deleteAdmin(
+            @Header("Authorization") String auth,
+            @Path("id") String adminId);
+
+    // ── HOD Dashboard ─────────────────────────────────────────────────────────
+    @GET("api/hod/dashboard")
+    Call<DashboardModels.HodDashboard> getHodDashboard(@Header("Authorization") String auth);
+
+    // ── Admissions ────────────────────────────────────────────────────────────
+    @GET("api/admissions")
+    Call<List<DashboardModels.Admission>> getAdmissions(@Header("Authorization") String auth);
+
+    @GET("api/admissions/stats")
+    Call<DashboardModels.AdmissionsStats> getAdmissionsStats(@Header("Authorization") String auth);
+
+    // ── Shared short-path routes ──────────────────────────────────────────────
+    @GET("api/students")
+    Call<List<DashboardModels.Student>> getStudents(@Header("Authorization") String auth);
+
+    @GET("api/staff")
+    Call<List<DashboardModels.Staff>> getStaff(@Header("Authorization") String auth);
+
+    @GET("api/programs")
+    Call<List<DashboardModels.Program>> getAllPrograms(@Header("Authorization") String auth);
+
+    @GET("api/research")
+    Call<DashboardModels.ResearchSummary> getResearch(@Header("Authorization") String auth);
+
+    // ── Documents ─────────────────────────────────────────────────────────────
+    @GET("api/documents")
+    Call<List<DashboardModels.Document>> getDocuments(@Header("Authorization") String auth);
+
+    // ── Admin extended ────────────────────────────────────────────────────────
+    @GET("api/admin/academic-years")
+    Call<List<DashboardModels.AcademicYear>> getAcademicYears(@Header("Authorization") String auth);
+
+    @GET("api/admin/semesters")
+    Call<List<DashboardModels.Semester>> getSemesters(@Header("Authorization") String auth);
+
+    @DELETE("api/admin/students/{id}")
+    Call<DashboardModels.GenericResponse> deleteStudent(
+            @Header("Authorization") String auth,
+            @Path("id") String id);
+
+    @DELETE("api/admin/staff/{id}")
+    Call<DashboardModels.GenericResponse> deleteStaff(
+            @Header("Authorization") String auth,
+            @Path("id") String id);
 }

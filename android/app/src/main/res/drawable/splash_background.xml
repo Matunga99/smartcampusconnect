@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Background fill — slate-900 -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#0f172a"/>
+        </shape>
+    </item>
+    <!-- Centered app icon circle -->
+    <item
+        android:gravity="center"
+        android:width="96dp"
+        android:height="96dp">
+        <shape android:shape="oval">
+            <solid android:color="#4f46e5"/>
+        </shape>
+    </item>
+</layer-list>

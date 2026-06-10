@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SmartCampusConnect X App Icon — SC monogram on indigo background -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Background circle -->
+    <path
+        android:fillColor="#4f46e5"
+        android:pathData="M54,54 m-54,0 a54,54 0,1,0 108,0 a54,54 0,1,0 -108,0"/>
+
+    <!-- Inner white glow ring -->
+    <path
+        android:fillColor="#ffffff"
+        android:fillAlpha="0.12"
+        android:pathData="M54,54 m-38,0 a38,38 0,1,0 76,0 a38,38 0,1,0 -76,0"/>
+
+    <!-- Letter S (left half of SC) -->
+    <path
+        android:fillColor="#ffffff"
+        android:pathData="M38,38 L54,38 Q60,38 60,44 Q60,50 54,50 L44,50 Q38,50 38,56 Q38,62 44,62 L60,62 L60,70 L44,70 Q32,70 32,56 Q32,44 44,44 L54,44 Q56,44 56,42 Q56,38 54,38 Z"
+        android:strokeColor="#00000000"
+        android:strokeWidth="1"/>
+
+    <!-- Letter C (right half of SC) -->
+    <path
+        android:fillColor="#ffffff"
+        android:pathData="M70,46 Q64,38 56,38 L64,38 Q76,38 76,54 Q76,70 64,70 L56,70 Q64,70 70,62 L76,62 Q82,62 76,70 Q70,76 62,76 L56,76 Q44,76 38,66 L44,66 Q50,72 58,72 Q68,72 74,64 Q80,56 74,46 Z"
+        android:strokeColor="#00000000"
+        android:strokeWidth="1"/>
+
+</vector>

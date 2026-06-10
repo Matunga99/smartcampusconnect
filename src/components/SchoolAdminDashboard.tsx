@@ -3789,7 +3789,7 @@ export default function SchoolAdminDashboard({
                                           onClick={async () => {
                                             try {
                                               const h = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
-                                              const r = await fetch('/api/admin/announcements', {
+                                              const r = await fetch('/api/communications/announcements', {
                                                 method: 'POST',
                                                 headers: h,
                                                 body: JSON.stringify({
