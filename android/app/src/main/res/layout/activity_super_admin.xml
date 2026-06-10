@@ -1,94 +1,78 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0f172a"
-    android:padding="24dp">
+    android:background="#0f172a">
 
-    <!-- Header info -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="SUOS SUPERADMIN IDENTITY GATE"
-        android:textColor="#a855f7"
-        android:textSize="11sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="4dp"/>
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar_super"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="#1e293b"
+        app:title="@string/app_name"
+        app:titleTextColor="#ffffff"/>
 
-    <TextView
-        android:id="@+id/tv_admin_welcome"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Welcome Master Admin"
-        android:textColor="#ffffff"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="24dp"/>
-
-    <!-- Operational capabilities section -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#1e293b"
+        android:padding="16dp">
 
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Active Tenant Dashboard Details"
-            android:textColor="#94a3b8"
-            android:textSize="13sp"
-            android:layout_marginBottom="16dp"/>
+            android:text="SUPER ADMIN — GLOBAL CONTROL"
+            android:textColor="#a855f7"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.15"/>
 
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
+        <TextView
+            android:id="@+id/tv_admin_welcome"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:backgroundTint="#1e293b"
-            android:layout_marginBottom="16dp">
-            
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Active Multi-Tenant Mode"
-                    android:textColor="#64748b"
-                    android:textSize="10sp"/>
-                <TextView
-                    android:id="@+id/tv_tenant_desc"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Global Super Operational State"
-                    android:textColor="#ffffff"
-                    android:textSize="14sp"
-                    android:layout_marginTop="4dp"
-                    android:textStyle="bold"/>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <!-- Access Profile Panel directly -->
-        <Button
-            android:id="@+id/btn_superadmin_profile"
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:text="Configure My Developer Profile"
-            android:backgroundTint="#4f46e5"
+            android:text="Welcome, Super Admin"
             android:textColor="#ffffff"
-            android:layout_marginBottom="12dp" />
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginTop="2dp"/>
 
+        <TextView
+            android:id="@+id/tv_tenant_desc"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Global Multi-Institution Scope"
+            android:textColor="#94a3b8"
+            android:textSize="12sp"
+            android:layout_marginTop="2dp"/>
     </LinearLayout>
 
-    <!-- Logout control -->
-    <Button
-        android:id="@+id/btn_superadmin_logout"
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tab_layout_super"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:text="@string/btn_logout"
-        android:backgroundTint="#ef4444"
-        android:textColor="#ffffff" />
+        android:layout_height="wrap_content"
+        android:background="#0f172a"
+        app:tabTextColor="#64748b"
+        app:tabSelectedTextColor="#a855f7"
+        app:tabIndicatorColor="#a855f7"
+        app:tabMode="scrollable"/>
+
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/pager_super"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"/>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_nav_super"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1e293b"
+        app:itemIconTint="@color/bottom_nav_color"
+        app:itemTextColor="@color/bottom_nav_color"
+        app:menu="@menu/menu_super_admin"/>
 
 </LinearLayout>

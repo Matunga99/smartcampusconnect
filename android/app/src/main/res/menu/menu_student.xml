@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/nav_home"
+        android:icon="@android:drawable/ic_menu_compass"
+        android:title="Home"/>
+    <item android:id="@+id/nav_courses"
+        android:icon="@android:drawable/ic_menu_agenda"
+        android:title="Courses"/>
+    <item android:id="@+id/nav_results"
+        android:icon="@android:drawable/ic_menu_report_image"
+        android:title="Results"/>
+    <item android:id="@+id/nav_finance"
+        android:icon="@android:drawable/ic_menu_manage"
+        android:title="Finance"/>
+    <item android:id="@+id/nav_profile"
+        android:icon="@android:drawable/ic_menu_myplaces"
+        android:title="Profile"/>
+</menu>

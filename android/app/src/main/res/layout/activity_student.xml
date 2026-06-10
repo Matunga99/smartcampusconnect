@@ -1,94 +1,84 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0f172a"
-    android:padding="24dp">
+    android:background="#0f172a">
 
-    <!-- Header info -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="SUOS STUDENT DIGITAL GATEWAY"
-        android:textColor="#10b981"
-        android:textSize="11sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="4dp"/>
+    <!-- Top App Bar -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar_student"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="#1e293b"
+        app:title="@string/app_name"
+        app:titleTextColor="#ffffff"
+        app:subtitleTextColor="#94a3b8" />
 
-    <TextView
-        android:id="@+id/tv_student_welcome"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Welcome registered scholar"
-        android:textColor="#ffffff"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="24dp"/>
-
-    <!-- Operational capabilities section -->
+    <!-- Header card -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#1e293b"
+        android:padding="16dp">
 
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Your Campus Student Association Domain"
-            android:textColor="#94a3b8"
-            android:textSize="13sp"
-            android:layout_marginBottom="16dp"/>
+            android:text="STUDENT PORTAL"
+            android:textColor="#10b981"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.15"/>
 
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
+        <TextView
+            android:id="@+id/tv_student_welcome"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:backgroundTint="#1e293b"
-            android:layout_marginBottom="16dp">
-            
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Affiliated Academy Tenant"
-                    android:textColor="#64748b"
-                    android:textSize="10sp"/>
-                <TextView
-                    android:id="@+id/tv_student_school"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Loading Active Institutional Code..."
-                    android:textColor="#ffffff"
-                    android:textSize="14sp"
-                    android:layout_marginTop="4dp"
-                    android:textStyle="bold"/>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <!-- Access Profile Panel directly -->
-        <Button
-            android:id="@+id/btn_student_profile"
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:text="@string/nav_profile"
-            android:backgroundTint="#4f46e5"
+            android:text="Welcome, Scholar"
             android:textColor="#ffffff"
-            android:layout_marginBottom="12dp" />
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginTop="2dp"/>
 
+        <TextView
+            android:id="@+id/tv_student_regnum"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Reg No: —"
+            android:textColor="#94a3b8"
+            android:textSize="12sp"
+            android:layout_marginTop="2dp"/>
     </LinearLayout>
 
-    <!-- Logout control -->
-    <Button
-        android:id="@+id/btn_student_logout"
+    <!-- Tab Row -->
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tab_layout_student"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:text="@string/btn_logout"
-        android:backgroundTint="#ef4444"
-        android:textColor="#ffffff"/>
+        android:layout_height="wrap_content"
+        android:background="#0f172a"
+        app:tabTextColor="#64748b"
+        app:tabSelectedTextColor="#4f46e5"
+        app:tabIndicatorColor="#4f46e5"
+        app:tabMode="scrollable"/>
+
+    <!-- Content pager -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/pager_student"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"/>
+
+    <!-- Bottom nav -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_nav_student"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1e293b"
+        app:itemIconTint="@color/bottom_nav_color"
+        app:itemTextColor="@color/bottom_nav_color"
+        app:menu="@menu/menu_student" />
 
 </LinearLayout>

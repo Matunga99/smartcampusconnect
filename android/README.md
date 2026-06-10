@@ -1,103 +1,97 @@
-# 🎯 SmartCampus Connect X (SUOS) - Android Java Native Application
+# SmartCampusConnect X — Android App
 
-Welcome to the official, native Java Android client layer for **SmartCampus Connect X / SUOS**! 
+A fully-connected native Android client for the SmartCampusConnect X backend.
 
-This high-performance client app utilizes modern Android architecture concepts to seamlessly interface with the central Node.js/Express full-stack backend service (`server.ts`). It adheres strictly to the requirement of behaving exclusively as an API consumer layer—leaving all business rules, database queries, and system state rules to the robust main server.
-
----
-
-## 📂 Complete Android Architecture Map
-
-The repository is organized following clean architectural patterns:
+## Architecture
 
 ```
-/android
-├── build.gradle                              # Project-wide dependencies & build properties
-├── settings.gradle                           # Subsystem declaration & app module anchor
-└── app
-    ├── build.gradle                          # Android build SDK, namespace, and dependencies
-    └── src
-        └── main
-            ├── AndroidManifest.xml           # App declarations, permissions, launcher intent
-            ├── res
-            │   ├── layout
-            │   │   ├── activity_login.xml    # Gateway UI with API address input
-            │   │   ├── activity_profile.xml  # Nested, multi-parameter editor layout
-            │   │   ├── activity_super_admin.xml # SuperAdmin specialized dashboard controls
-            │   │   ├── activity_admin.xml    # Campus Administrator hub panel
-            │   │   ├── activity_lecturer.xml # Academic Staff and lecturer board
-            │   │   └── activity_student.xml  # Student digital identity card hub
-            │   └── values
-            │       ├── strings.xml           # Multi-lingual UI literals
-            │       └── themes.xml            # Custom DayNight modern theme constraints
-            └── java
-                └── com
-                    └── smartcampus
-                        └── connect
-                            ├── LoginActivity.java     # Secure session check & credentials storage
-                            ├── SuperAdminActivity.java # Role navigation targets
-                            ├── AdminActivity.java
-                            ├── LecturerActivity.java
-                            ├── StudentActivity.java
-                            ├── ProfileActivity.java   # GET & PUT profile data synchronizer
-                            ├── api
-                            │   ├── ApiClient.java     # Dynamic Retrofit initializer (OkHttp Logger)
-                            │   └── ApiService.java    # Retrofit Interface mapping server endpoints
-                            └── models
-                                ├── AuthModels.java    # JWT Authentication Request/Response structures
-                                └── ProfileModels.java # Complex profile nested update definitions
+android/
+├── app/               # Main application module
+│   └── src/main/java/com/smartcampus/connect/
+│       ├── LoginActivity.java          — Auth gateway (all roles)
+│       ├── StudentActivity.java        — Student portal (6 tabs)
+│       ├── LecturerActivity.java       — Lecturer workspace (5 tabs)
+│       ├── AdminActivity.java          — School admin console (5 tabs)
+│       ├── SuperAdminActivity.java     — Super admin global view (3 tabs)
+│       ├── ProfileActivity.java        — Shared profile editor
+│       ├── DashboardPagerAdapter.java  — Generic tab pager adapter
+│       ├── api/
+│       │   ├── ApiClient.java          — Retrofit factory (dynamic base URL)
+│       │   └── ApiService.java         — All 30+ API endpoint interfaces
+│       ├── models/
+│       │   ├── AuthModels.java         — Login/session models
+│       │   ├── ProfileModels.java      — Profile request/response
+│       │   └── DashboardModels.java    — All dashboard data models
+│       ├── fragments/
+│       │   └── DashboardTabFragment.java — Role-aware tab fragment
+│       └── utils/
+│           ├── SessionManager.java     — SharedPreferences wrapper
+│           └── UiHelper.java           — Dynamic card builder
+└── sdk/               # Reusable SDK library module (SuosSDK)
+    └── SuosSDK.java   — Single-entry-point SDK for third-party integrations
 ```
 
----
+## Features by Role
 
-## ⚡ Key Architectural Features & Libraries
+### Student
+- Overview with announcements
+- Registered units with attendance & grades
+- Timetable / class schedule
+- Exam results & transcript
+- Finance: invoices & fee balances
+- Library: borrowings & fines
 
-1. **Client-Only Independence**: Absolutely no duplicated business logic. It relies completely on the shared Express REST API.
-2. **Retrofit + GSON Converters**: Configured with dynamic base URL support allowing you to test local, emulator, or production environments without hardcoded assets.
-3. **OkHttp Logging Interceptors**: Full terminal debug feedback trace for all request-response cycles.
-4. **SharedPreferences Secure Tunnel**: Safe, encrypted-by-default persistent caching of the authorization token (JWT), tenant identifier (`schoolId`), full name, email, and user role.
-5. **Decentralized Multi-Tenant Routing**: Dynamically displays and filters active context based on the signed-in user's tenant identifier (`schoolId`), facilitating full multi-tenant sandboxing.
-6. **Multi-Role Flow Switcher**: On successful login, the application resolves the user's role from the JWT, automatically routing them to the correct dashboard Activity:
-   - `superadmin` ➔ `SuperAdminActivity`
-   - `admin` ➔ `AdminActivity`
-   - `staff` / `lecturer` ➔ `LecturerActivity`
-   - `student` ➔ `StudentActivity`
+### Lecturer / Staff
+- Overview with announcements
+- Teaching assignments
+- Attendance session management
+- Grade students
 
----
+### School Admin
+- Dashboard with school stats
+- Full students directory
+- Staff directory
+- Academic years management
 
-## 🌍 Endpoint Consumption Details
+### Super Admin
+- Platform overview (total schools, students, staff)
+- All institutions list with enable/disable status
 
-The Android application leverages existing Express API definitions to maintain compliance with:
+## Setup
 
-* **Session Authorization**: `POST <api-url>/api/auth/login`
-  * Body: `{ "email": "...", "password": "..." }`
-  * Response: `{ "token": "...", "user": { "role": "...", "schoolId": "...", ... } }`
+1. Open the `android/` folder in **Android Studio Hedgehog (2023.1.1)** or later.
+2. Build the project — all dependencies are fetched via Gradle.
+3. On the Login screen enter your **API Server URL** (e.g. `https://your-server.app`).
+4. Use any valid account credentials from your SmartCampusConnect X backend.
 
-* **Bio Retrieval**: `GET <api-url>/api/profile/me`
-  * Header: `Authorization: Bearer <token>`
-  * Response: Returns the complete user-profile schema including bio and details nested within `profile`.
+## Default Test Accounts
 
-* **Bio Modification**: `PUT <api-url>/api/profile/me`
-  * Header: `Authorization: Bearer <token>`
-  * Body: Mapped as `{ "email": "...", "profile": { "phone": "...", "dob": "...", "gender": "...", "address": "...", "bio": "..." } }`
-  * Response: `{ "message": "Profile updated successfully", "user": { ... } }`
+| Role       | Email                     | Password  |
+|------------|---------------------------|-----------|
+| SuperAdmin | superadmin.com            | 12345678  |
+| Admin      | admin@nairobi.edu         | 12345678  |
+| Lecturer   | lecturer@nairobi.edu      | 12345678  |
+| Student    | student@nairobi.edu       | 12345678  |
 
----
+## SDK Usage (for third-party integrations)
 
-## 🛠️ Step-by-Step Production Setup & Build Guide
+```java
+// Initialize once (e.g., in Application.onCreate)
+SuosSDK.initialize("https://your-server.app");
 
-### Prerequisities
-- **Android Studio (Giraffe / Hedgehog or modern Koala recommended)**
-- **JDK 11 or higher** configured in system environment variables (and targeted under Android build configuration settings).
+// Login
+SuosSDK.getInstance().login(email, password, new Callback<AuthModels.LoginResponse>() {
+    @Override public void onResponse(Call<LoginResponse> c, Response<LoginResponse> r) {
+        if (r.isSuccessful()) {
+            SuosSDK.getInstance().setAuthToken(r.body().token);
+        }
+    }
+    @Override public void onFailure(Call<LoginResponse> c, Throwable t) { }
+});
 
-### Execution Instructions
-1. Open **Android Studio**.
-2. Select **Open an existing project** and navigate directly to the `/android` directory.
-3. Allow **Gradle sync** to download dependencies (Retrofit, Gson, CircleImageView, ConstraintLayout, and Material Components).
-4. Run/Debug in your Android Virtual Device (AVD Emulator) or connect a physical developer device via USB.
-5. Enter the **API Base URL** in the gateway field during launch. 
-   - *Tip (Local Emulator Testing)*: If running the Node repository server locally on your workstation, map to `http://10.0.2.2:3000` inside your emulator to bypass local loopback limits.
-   - *Tip (Sandbox Cloud Testing)*: Use the default pre-filled development URL which securely proxy-points to the running application backend.
+// Get student registrations
+SuosSDK.getInstance().getMyRegistrations(new Callback<List<SdkModels.CourseRegistration>>() { ... });
 
----
-🚀 *Crafted beautifully with senior Android & backend architectural guidelines.* Built exclusively on your secure system, this application acts as a clean, responsive client layer.
+// Admin: get all students
+SuosSDK.getInstance().getStudents(new Callback<List<SdkModels.Student>>() { ... });
+```

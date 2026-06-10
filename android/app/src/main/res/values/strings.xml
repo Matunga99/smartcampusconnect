@@ -6,6 +6,22 @@
     <string name="password_hint">Password</string>
     <string name="btn_login">Authorize Session</string>
     <string name="nav_profile">My Profile</string>
-    <string name="btn_save_changes">Save Profile changes</string>
-    <string name="btn_logout">Terminate Session (Logout)</string>
+    <string name="btn_save_changes">Save Profile Changes</string>
+    <string name="btn_logout">Sign Out</string>
+
+    <!-- Tab labels -->
+    <string name="tab_overview">Overview</string>
+    <string name="tab_courses">Courses</string>
+    <string name="tab_timetable">Timetable</string>
+    <string name="tab_results">Results</string>
+    <string name="tab_finance">Finance</string>
+    <string name="tab_library">Library</string>
+    <string name="tab_units">My Units</string>
+    <string name="tab_attendance">Attendance</string>
+    <string name="tab_grades">Grades</string>
+    <string name="tab_students">Students</string>
+    <string name="tab_staff">Staff</string>
+    <string name="tab_academics">Academics</string>
+    <string name="tab_schools">Schools</string>
+    <string name="tab_dashboard">Dashboard</string>
 </resources>

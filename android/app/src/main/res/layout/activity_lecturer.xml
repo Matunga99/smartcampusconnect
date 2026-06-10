@@ -1,94 +1,79 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0f172a"
-    android:padding="24dp">
+    android:background="#0f172a">
 
-    <!-- Header info -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="SUOS LECTURER / STAFF COPTIC WORKSPACE"
-        android:textColor="#ef4444"
-        android:textSize="11sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="4dp"/>
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar_lecturer"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="#1e293b"
+        app:title="@string/app_name"
+        app:titleTextColor="#ffffff"
+        app:subtitleTextColor="#94a3b8"/>
 
-    <TextView
-        android:id="@+id/tv_lecturer_welcome"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Welcome Professor, Academic Core"
-        android:textColor="#ffffff"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="24dp"/>
-
-    <!-- Operational capabilities section -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#1e293b"
+        android:padding="16dp">
 
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Academic Department Context"
-            android:textColor="#94a3b8"
-            android:textSize="13sp"
-            android:layout_marginBottom="16dp"/>
+            android:text="LECTURER / STAFF PORTAL"
+            android:textColor="#ef4444"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.15"/>
 
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
+        <TextView
+            android:id="@+id/tv_lecturer_welcome"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:backgroundTint="#1e293b"
-            android:layout_marginBottom="16dp">
-            
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Tenant ID Registration Profile"
-                    android:textColor="#64748b"
-                    android:textSize="10sp"/>
-                <TextView
-                    android:id="@+id/tv_lecturer_school"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Loading Active Institutional Code..."
-                    android:textColor="#ffffff"
-                    android:textSize="14sp"
-                    android:layout_marginTop="4dp"
-                    android:textStyle="bold"/>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <!-- Access Profile Panel directly -->
-        <Button
-            android:id="@+id/btn_lecturer_profile"
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:text="@string/nav_profile"
-            android:backgroundTint="#4f46e5"
+            android:text="Welcome, Professor"
             android:textColor="#ffffff"
-            android:layout_marginBottom="12dp" />
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginTop="2dp"/>
 
+        <TextView
+            android:id="@+id/tv_lecturer_school"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Institution: —"
+            android:textColor="#94a3b8"
+            android:textSize="12sp"
+            android:layout_marginTop="2dp"/>
     </LinearLayout>
 
-    <!-- Logout control -->
-    <Button
-        android:id="@+id/btn_lecturer_logout"
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tab_layout_lecturer"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:text="@string/btn_logout"
-        android:backgroundTint="#ef4444"
-        android:textColor="#ffffff"/>
+        android:layout_height="wrap_content"
+        android:background="#0f172a"
+        app:tabTextColor="#64748b"
+        app:tabSelectedTextColor="#ef4444"
+        app:tabIndicatorColor="#ef4444"
+        app:tabMode="scrollable"/>
+
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/pager_lecturer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"/>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_nav_lecturer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1e293b"
+        app:itemIconTint="@color/bottom_nav_color"
+        app:itemTextColor="@color/bottom_nav_color"
+        app:menu="@menu/menu_lecturer"/>
 
 </LinearLayout>
