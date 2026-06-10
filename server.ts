@@ -1476,8 +1476,25 @@ function writeDb(data: any) {
   fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
 }
 
-// Ensure database file is initialized on server start
-readDb();
+// ── On-startup password migration — hash any remaining plaintext passwords ───
+(function migratePasswords() {
+  const db = readDb();
+  let migrated = 0;
+  (db.users || []).forEach((u: any) => {
+    // bcrypt hashes always start with $2a$ or $2b$
+    if (u.passwordHash && !u.passwordHash.startsWith('$2')) {
+      u.passwordHash = bcrypt.hashSync(u.passwordHash, 10);
+      migrated++;
+    }
+  });
+  if (migrated > 0) {
+    writeDb(db);
+    console.log(`[STARTUP] Migrated ${migrated} plaintext password(s) to bcrypt.`);
+  }
+})();
+
+// Update login to support bcrypt hashes
+// (already done via passwordMatches check — bcrypt.compareSync handles $2 prefixed hashes)
 
 // Authentication middleware
 function getAuthenticatedUser(req: express.Request) {
@@ -1584,8 +1601,14 @@ app.post('/api/auth/login', (req, res) => {
     return;
   }
 
-  // Verify password: allow standard passwordHash OR fallback to admission number for students
-  let passwordMatches = (user.passwordHash === password);
+  // Verify password: support bcrypt hashes and legacy plaintext fallback
+  let passwordMatches = false;
+  if (user.passwordHash && user.passwordHash.startsWith('$2')) {
+    passwordMatches = bcrypt.compareSync(password, user.passwordHash);
+  } else {
+    passwordMatches = (user.passwordHash === password);
+  }
+  // Extra fallback: students can log in with their reg number as password
   if (!passwordMatches && user.role === 'student' && user.regNumber) {
     if (user.regNumber.toLowerCase().trim() === password.toLowerCase().trim()) {
       passwordMatches = true;
