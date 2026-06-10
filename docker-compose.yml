@@ -1,0 +1,31 @@
+version: '3.9'
+
+services:
+  app:
+    build: .
+    container_name: smartcampusconnect
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_PATH=/app/data/db.json
+      - UPLOAD_DIR=/app/uploads
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - APP_URL=${APP_URL:-http://localhost:3000}
+    volumes:
+      - scc_data:/app/data
+      - scc_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/super/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  scc_data:
+    driver: local
+  scc_uploads:
+    driver: local

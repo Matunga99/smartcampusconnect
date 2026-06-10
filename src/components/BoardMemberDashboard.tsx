@@ -180,7 +180,7 @@ export default function BoardMemberDashboard({ token, user, onLogout, appendLog 
         </div>
 
         {activeTab === 'profile' && (
-          <div className="p-6"><ProfilePage token={token} user={user} onBack={() => setActiveTab('dashboard')} /></div>
+          <div className="p-6"><ProfilePage token={token} user={user} onLogout={onLogout} /></div>
         )}
       </div>
     </div>

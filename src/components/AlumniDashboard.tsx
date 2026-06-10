@@ -327,7 +327,7 @@ export default function AlumniDashboard({ token, user, onLogout, appendLog }: Pr
           </div>
         )}
 
-        {activeTab === 'communications' && <CommunicationsHub token={token} user={user} isPhoneFrame={false} />}
+        {activeTab === 'communications' && <CommunicationsHub user={user} />}
       </div>
     </div>
   );

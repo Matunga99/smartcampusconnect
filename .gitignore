@@ -6,3 +6,23 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Database — never commit real data
+db.json
+
+# Uploads
+uploads/
+
+# Android build outputs
+android/.gradle/
+android/app/build/
+android/sdk/build/
+android/local.properties
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# IDE
+.idea/
+*.iml

@@ -143,22 +143,44 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     /**
-     * Decentralized navigation index map switcher routing. It maps backend roles to 
-     * specific Native Activities as per exact requirement guidelines.
+     * Routes every backend role to the correct Activity.
      */
     private void navigateToDashboard(String role) {
         Intent intent;
-        if ("superadmin".equalsIgnoreCase(role)) {
-            intent = new Intent(this, SuperAdminActivity.class);
-        } else if ("admin".equalsIgnoreCase(role)) {
-            intent = new Intent(this, AdminActivity.class);
-        } else if ("staff".equalsIgnoreCase(role) || "lecturer".equalsIgnoreCase(role)) {
-            intent = new Intent(this, LecturerActivity.class);
-        } else if ("student".equalsIgnoreCase(role)) {
-            intent = new Intent(this, StudentActivity.class);
-        } else {
-            // Default elegant fallback route container
-            intent = new Intent(this, StudentActivity.class);
+        switch (role.toLowerCase()) {
+            case "superadmin":
+                intent = new Intent(this, SuperAdminActivity.class);
+                break;
+            case "admin":
+                intent = new Intent(this, AdminActivity.class);
+                break;
+            case "staff":
+            case "lecturer":
+                intent = new Intent(this, LecturerActivity.class);
+                break;
+            case "student":
+                intent = new Intent(this, StudentActivity.class);
+                break;
+            // All other roles go to the generic role dashboard
+            case "parent":
+            case "registrar":
+            case "bursar":
+            case "accountant":
+            case "hod":
+            case "dean":
+            case "principal":
+            case "deputyprincipal":
+            case "boardmember":
+            case "alumni":
+            case "securityofficer":
+            case "librarian":
+            case "hostelmanager":
+            case "transportmanager":
+            case "hrofficer":
+            case "procurementofficer":
+            default:
+                intent = new Intent(this, GenericRoleDashboard.class);
+                break;
         }
         startActivity(intent);
     }

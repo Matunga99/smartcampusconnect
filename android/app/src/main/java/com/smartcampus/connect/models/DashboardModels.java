@@ -310,4 +310,60 @@ public class DashboardModels {
         public String message;
         public boolean success;
     }
+
+    // ── Change password ───────────────────────────────────────────────────────
+
+    public static class ChangePasswordRequest {
+        @SerializedName("currentPassword") public String currentPassword;
+        @SerializedName("newPassword")     public String newPassword;
+
+        public ChangePasswordRequest(String current, String newPwd) {
+            this.currentPassword = current;
+            this.newPassword = newPwd;
+        }
+    }
+
+    // ── QR Attendance ─────────────────────────────────────────────────────────
+
+    public static class QrScanRequest {
+        @SerializedName("sessionId") public String sessionId;
+        @SerializedName("qrToken")   public String qrToken;
+
+        public QrScanRequest(String sessionId, String qrToken) {
+            this.sessionId = sessionId;
+            this.qrToken = qrToken;
+        }
+    }
+
+    public static class QrSessionData {
+        public String sessionId;
+        public String unitCode;
+        public String unitName;
+        public String currentQrToken;
+        public String expiresAt;
+        public String status;
+    }
+
+    // ── Finance summary ───────────────────────────────────────────────────────
+
+    public static class FinanceSummary {
+        public double totalInvoiced;
+        public double totalCollected;
+        public double outstanding;
+        public int invoiceCount;
+        public int paidCount;
+        public int pendingCount;
+        public List<Invoice> recentInvoices;
+    }
+
+    // ── Admin user (for super-admin admins list) ──────────────────────────────
+
+    public static class AdminUser {
+        public String id;
+        public String name;
+        public String email;
+        public String phone;
+        public String schoolId;
+        public String schoolName;
+    }
 }

@@ -162,8 +162,8 @@ export default function DeanDashboard({ token, user, onLogout, appendLog }: Prop
           </div>
         )}
 
-        {activeTab === 'communications' && <CommunicationsHub token={token} user={user} isPhoneFrame={false} />}
-        {activeTab === 'profile' && <ProfilePage token={token} user={user} onBack={() => setActiveTab('dashboard')} />}
+        {activeTab === 'communications' && <CommunicationsHub user={user} />}
+        {activeTab === 'profile' && <ProfilePage token={token} user={user} onLogout={onLogout} />}
       </div>
     </div>
   );

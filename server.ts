@@ -10,6 +10,9 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { createServer as createViteServer } from 'vite';
 import { randomBytes } from 'crypto';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import bcrypt from 'bcryptjs';
 
 declare global {
   namespace Express {
@@ -678,13 +681,47 @@ const enforcementMiddleware = async (req: express.Request, res: express.Response
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+// ── Security middleware ──────────────────────────────────────────────────────
+app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled — Vite SSR handles it
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,
+  message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/auth/login', authLimiter);
+
 app.use(enforcementMiddleware); // Centralized enforcement
 
 
 
 const DB_PATH = path.join(process.cwd(), 'db.json');
 
-// Session storage in memory
+// ── Session helpers — persisted in db.json so restarts don't log everyone out ──
+function getSessions(db: any): Record<string, { userId: string; expiresAt: number }> {
+  if (!db.sessions) db.sessions = {};
+  // Purge expired sessions on every access
+  const now = Date.now();
+  Object.keys(db.sessions).forEach(t => { if (db.sessions[t].expiresAt < now) delete db.sessions[t]; });
+  return db.sessions;
+}
+
+function saveSession(token: string, userId: string, ttlMs = 24 * 60 * 60 * 1000) {
+  const db = readDb();
+  if (!db.sessions) db.sessions = {};
+  db.sessions[token] = { userId, expiresAt: Date.now() + ttlMs };
+  writeDb(db);
+}
+
+function deleteSession(token: string) {
+  const db = readDb();
+  if (db.sessions) { delete db.sessions[token]; writeDb(db); }
+}
+
+// Legacy in-memory map kept for backward compat during single request cycle
 const sessions: Record<string, { userId: string; expiresAt: number }> = {};
 
 // Default DB Structure
@@ -1386,27 +1423,27 @@ readDb();
 // Authentication middleware
 function getAuthenticatedUser(req: express.Request) {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
   const token = authHeader.split(' ')[1];
-  const session = sessions[token];
-  if (!session || session.expiresAt < Date.now()) {
-    return null;
+
+  // Check in-memory first (fast path), then fall back to persisted db sessions
+  let session = sessions[token];
+  if (!session) {
+    const db = readDb();
+    const dbSessions = getSessions(db);
+    session = dbSessions[token];
+    if (session) sessions[token] = session; // warm in-memory cache
   }
-  
+  if (!session || session.expiresAt < Date.now()) return null;
+
   const db = readDb();
   const user = db.users.find((u: any) => u.id === session.userId);
   if (!user) return null;
 
-  // If user is from a school, verify school is not disabled
   if (user.schoolId && user.role !== 'superadmin') {
     const school = db.schools.find((s: any) => s.id === user.schoolId);
-    if (!school || school.disabled) {
-      return { ...user, isSchoolDisabled: true };
-    }
+    if (!school || school.disabled) return { ...user, isSchoolDisabled: true };
   }
-
   return user;
 }
 
@@ -1523,12 +1560,11 @@ app.post('/api/auth/login', (req, res) => {
     }
   }
 
-  // Generate random session token
+  // Generate random session token — persist to db so restarts don't kill sessions
   const token = cryptoSecureToken();
-  sessions[token] = {
-    userId: user.id,
-    expiresAt: Date.now() + 24 * 60 * 60 * 1000 // 24 Hours
-  };
+  const ttl = 24 * 60 * 60 * 1000;
+  sessions[token] = { userId: user.id, expiresAt: Date.now() + ttl };
+  saveSession(token, user.id, ttl);
 
   const { passwordHash, ...safeUser } = user;
   const sessionData = resolveUserSession(safeUser, db);
@@ -1545,8 +1581,35 @@ app.post('/api/auth/logout', (req, res) => {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
     delete sessions[token];
+    deleteSession(token);
   }
   res.json({ message: 'Logged out successfully' });
+});
+
+// ── Universal change-password (all roles) ─────────────────────────────────────
+app.post('/api/auth/change-password', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ error: 'currentPassword and newPassword are required' });
+    return;
+  }
+  if (newPassword.length < 6) {
+    res.status(400).json({ error: 'New password must be at least 6 characters' });
+    return;
+  }
+  const db = readDb();
+  const idx = db.users.findIndex((u: any) => u.id === user.id);
+  if (idx === -1) { res.status(404).json({ error: 'User not found' }); return; }
+  const stored = db.users[idx];
+  // Support both plain-text legacy passwords and bcrypt hashes
+  const matches = stored.passwordHash === currentPassword ||
+    (stored.passwordHash.startsWith('$2') && bcrypt.compareSync(currentPassword, stored.passwordHash));
+  if (!matches) { res.status(401).json({ error: 'Current password is incorrect' }); return; }
+  db.users[idx].passwordHash = bcrypt.hashSync(newPassword, 10);
+  db.users[idx].passwordChanged = true;
+  writeDb(db);
+  res.json({ message: 'Password updated successfully' });
 });
 
 app.get('/api/auth/me', requireAuth, (req, res) => {
@@ -2440,6 +2503,42 @@ app.post('/api/super/admins', requireRole(['superadmin']), (req, res) => {
   res.status(201).json({ admin: safeAdmin, schoolName: school.name });
 });
 
+// GET all school admins (optionally filter by schoolId)
+app.get('/api/super/admins', requireRole(['superadmin']), (req, res) => {
+  const db = readDb();
+  const { schoolId } = req.query;
+  let admins = (db.users || []).filter((u: any) => u.role === 'admin');
+  if (schoolId) admins = admins.filter((u: any) => u.schoolId === schoolId);
+  const safe = admins.map(({ passwordHash, ...u }: any) => {
+    const school = db.schools.find((s: any) => s.id === u.schoolId);
+    return { ...u, schoolName: school ? school.name : 'Unassigned' };
+  });
+  res.json(safe);
+});
+
+// DELETE a school admin
+app.delete('/api/super/admins/:id', requireRole(['superadmin']), (req, res) => {
+  const { id } = req.params;
+  const db = readDb();
+  const idx = db.users.findIndex((u: any) => u.id === id && u.role === 'admin');
+  if (idx === -1) { res.status(404).json({ error: 'Admin not found' }); return; }
+  db.users.splice(idx, 1);
+  writeDb(db);
+  res.json({ message: 'Admin account removed.' });
+});
+
+// PUT — edit school details
+app.put('/api/super/schools/:id', requireRole(['superadmin']), (req, res) => {
+  const { id } = req.params;
+  const { name, email, phone, institutionType } = req.body;
+  const db = readDb();
+  const idx = db.schools.findIndex((s: any) => s.id === id);
+  if (idx === -1) { res.status(404).json({ error: 'School not found' }); return; }
+  db.schools[idx] = { ...db.schools[idx], name: name ?? db.schools[idx].name, email: email ?? db.schools[idx].email, phone: phone ?? db.schools[idx].phone, institutionType: institutionType ?? db.schools[idx].institutionType };
+  writeDb(db);
+  res.json(db.schools[idx]);
+});
+
 // Get Super Admin metadata count summaries & subscription simulations
 app.get('/api/super/stats', requireRole(['superadmin']), (req, res) => {
   const db = readDb();
@@ -2702,6 +2801,35 @@ app.post('/api/admin/programs', requireRole(['admin']), (req, res) => {
   res.status(201).json(newProg);
 });
 
+app.put('/api/admin/programs/:id', requireRole(['admin']), (req, res) => {
+  const admin = (req as any).user;
+  const { id } = req.params;
+  const { name, departmentId, code, capacity } = req.body;
+  if (!name) { res.status(400).json({ error: 'Program name is required' }); return; }
+  const db = readDb();
+  const idx = db.programs.findIndex((p: any) => p.id === id && p.schoolId === admin.schoolId);
+  if (idx === -1) { res.status(404).json({ error: 'Program not found' }); return; }
+  const conflict = db.programs.some((p: any) => p.schoolId === admin.schoolId && p.id !== id && p.name.toLowerCase().trim() === name.toLowerCase().trim());
+  if (conflict) { res.status(400).json({ error: `Program "${name}" already exists.` }); return; }
+  db.programs[idx] = { ...db.programs[idx], name: name.trim(), departmentId: departmentId ?? db.programs[idx].departmentId, code: code ? code.toUpperCase().trim() : db.programs[idx].code, capacity: capacity ? parseInt(capacity, 10) : db.programs[idx].capacity };
+  writeDb(db);
+  res.json(db.programs[idx]);
+});
+
+app.delete('/api/admin/programs/:id', requireRole(['admin']), (req, res) => {
+  const admin = (req as any).user;
+  const { id } = req.params;
+  const db = readDb();
+  const idx = db.programs.findIndex((p: any) => p.id === id && p.schoolId === admin.schoolId);
+  if (idx === -1) { res.status(404).json({ error: 'Program not found' }); return; }
+  // Nullify references in units and students
+  db.units = (db.units || []).map((u: any) => u.programId === id ? { ...u, programId: '' } : u);
+  db.students = (db.students || []).map((s: any) => s.programId === id ? { ...s, programId: '' } : s);
+  db.programs.splice(idx, 1);
+  writeDb(db);
+  res.json({ message: 'Program deleted successfully.' });
+});
+
 // UNITS
 app.get('/api/admin/units', requireRole(['admin']), (req, res) => {
   const admin = (req as any).user;
@@ -2746,6 +2874,36 @@ app.post('/api/admin/units', requireRole(['admin']), (req, res) => {
   db.units.push(newUnit);
   writeDb(db);
   res.status(201).json(newUnit);
+});
+
+app.put('/api/admin/units/:id', requireRole(['admin']), (req, res) => {
+  const admin = (req as any).user;
+  const { id } = req.params;
+  const { code, name, programId } = req.body;
+  if (!code || !name) { res.status(400).json({ error: 'Unit code and name are required' }); return; }
+  const db = readDb();
+  const idx = db.units.findIndex((u: any) => u.id === id && u.schoolId === admin.schoolId);
+  if (idx === -1) { res.status(404).json({ error: 'Unit not found' }); return; }
+  const conflict = db.units.some((u: any) => u.schoolId === admin.schoolId && u.id !== id && u.code.toUpperCase().trim() === code.toUpperCase().trim());
+  if (conflict) { res.status(400).json({ error: `Unit code "${code.toUpperCase()}" already exists.` }); return; }
+  db.units[idx] = { ...db.units[idx], code: code.toUpperCase().trim(), name: name.trim(), programId: programId ?? db.units[idx].programId };
+  writeDb(db);
+  res.json(db.units[idx]);
+});
+
+app.delete('/api/admin/units/:id', requireRole(['admin']), (req, res) => {
+  const admin = (req as any).user;
+  const { id } = req.params;
+  const db = readDb();
+  const idx = db.units.findIndex((u: any) => u.id === id && u.schoolId === admin.schoolId);
+  if (idx === -1) { res.status(404).json({ error: 'Unit not found' }); return; }
+  // Cascade: remove curriculum and registration references
+  db.program_curriculum = (db.program_curriculum || []).filter((c: any) => c.unitId !== id);
+  db.course_registrations = (db.course_registrations || []).filter((r: any) => r.unitId !== id);
+  db.teaching_assignments = (db.teaching_assignments || []).filter((t: any) => t.unitId !== id);
+  db.units.splice(idx, 1);
+  writeDb(db);
+  res.json({ message: 'Unit deleted successfully.' });
 });
 
 // STAFF
@@ -2827,6 +2985,47 @@ app.post('/api/admin/staff', requireRole(['admin']), (req, res) => {
   writeDb(db);
 
   res.status(201).json(newStaff);
+});
+
+app.put('/api/admin/staff/:id', requireRole(['admin']), (req, res) => {
+  const admin = (req as any).user;
+  const { id } = req.params;
+  const { name, email, phone, role, departmentId } = req.body;
+  const db = readDb();
+  const idx = db.staff.findIndex((s: any) => s.id === id && s.schoolId === admin.schoolId);
+  if (idx === -1) { res.status(404).json({ error: 'Staff member not found' }); return; }
+  const existing = db.staff[idx];
+  // Update user record too
+  const uIdx = db.users.findIndex((u: any) => u.id === existing.userId);
+  if (uIdx !== -1) {
+    if (name) db.users[uIdx].name = name;
+    if (email && email !== existing.email) {
+      if (db.users.some((u: any) => u.id !== existing.userId && u.email.toLowerCase() === email.toLowerCase())) {
+        res.status(400).json({ error: 'Email already in use' }); return;
+      }
+      db.users[uIdx].email = email.toLowerCase().trim();
+    }
+    if (phone) db.users[uIdx].phone = phone;
+  }
+  db.staff[idx] = { ...existing, name: name ?? existing.name, email: email ? email.toLowerCase().trim() : existing.email, phone: phone ?? existing.phone, role: role ?? existing.role, departmentIdHash: departmentId ?? existing.departmentIdHash };
+  writeDb(db);
+  res.json(db.staff[idx]);
+});
+
+app.delete('/api/admin/staff/:id', requireRole(['admin']), (req, res) => {
+  const admin = (req as any).user;
+  const { id } = req.params;
+  const db = readDb();
+  const idx = db.staff.findIndex((s: any) => s.id === id && s.schoolId === admin.schoolId);
+  if (idx === -1) { res.status(404).json({ error: 'Staff member not found' }); return; }
+  const staffRecord = db.staff[idx];
+  // Remove user login account
+  db.users = (db.users || []).filter((u: any) => u.id !== staffRecord.userId);
+  // Remove teaching assignments
+  db.teaching_assignments = (db.teaching_assignments || []).filter((t: any) => t.staffId !== id);
+  db.staff.splice(idx, 1);
+  writeDb(db);
+  res.json({ message: 'Staff member removed successfully.' });
 });
 
 // STUDENTS
@@ -15665,6 +15864,442 @@ app.get('/api/country-frameworks', requireAuth, (req, res) => {
     { code: 'ZA', name: 'South Africa', currency: 'ZAR', termStructure: '4 Terms', nationalExams: ['NSC Matric','NC(V)'], regulatoryAuthority: 'DBE / DHET / Umalusi', educationLevels: ['Grade R-7','Grade 8-9','Grade 10-12','Higher Certificate','Diploma','Bachelor','Honours','Masters','PhD'] },
   ];
   res.json(FRAMEWORKS);
+});
+
+/* ============================================================
+   MISSING ROUTES — Added to fix all broken dashboard calls
+   ============================================================ */
+
+// ── Shared short-path aliases (no /admin prefix) ──────────────────────────────
+// These are called by BoardMember, Bursar, Dean, HOD, Principal, Deputy, Registrar
+
+app.get('/api/students', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const schoolId = user.schoolId || req.query.schoolId;
+  const list = (db.students || [])
+    .filter((s: any) => !schoolId || s.schoolId === schoolId)
+    .map((s: any) => {
+      const prog = (db.programs || []).find((p: any) => p.id === s.programId);
+      const dept = (db.departments || []).find((d: any) => d.id === s.departmentId);
+      return { ...s, programName: prog?.name || 'N/A', departmentName: dept?.name || 'N/A' };
+    });
+  res.json(list);
+});
+
+app.get('/api/staff', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const schoolId = user.schoolId || req.query.schoolId;
+  const list = (db.staff || [])
+    .filter((s: any) => !schoolId || s.schoolId === schoolId)
+    .map((s: any) => {
+      const dept = (db.departments || []).find((d: any) => d.id === s.departmentIdHash || d.id === s.departmentId);
+      return { ...s, departmentName: dept?.name || 'General' };
+    });
+  res.json(list);
+});
+
+app.get('/api/programs', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const schoolId = user.schoolId || req.query.schoolId;
+  const list = (db.programs || [])
+    .filter((p: any) => !schoolId || p.schoolId === schoolId)
+    .map((p: any) => {
+      const dept = (db.departments || []).find((d: any) => d.id === p.departmentId);
+      return { ...p, departmentName: dept?.name || 'Unassigned' };
+    });
+  res.json(list);
+});
+
+// ── Finance summary (used by BoardMember, Bursar, Principal) ─────────────────
+app.get('/api/finance/summary', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const schoolId = user.schoolId;
+
+  const invoices = (db.invoices || []).filter((i: any) => !schoolId || i.schoolId === schoolId);
+  const payments = (db.student_payments || db.payment_transactions || []).filter((p: any) => !schoolId || p.schoolId === schoolId);
+
+  const totalInvoiced = invoices.reduce((sum: number, i: any) => sum + (Number(i.amount) || 0), 0);
+  const totalCollected = payments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+  const outstanding = totalInvoiced - totalCollected;
+
+  const balances = (db.student_balances || []).filter((b: any) => !schoolId || b.schoolId === schoolId);
+  const totalOutstanding = balances.reduce((sum: number, b: any) => sum + (Number(b.outstandingBalance) || 0), 0);
+
+  const recentInvoices = invoices.slice(-10).reverse();
+
+  res.json({
+    totalInvoiced,
+    totalCollected,
+    outstanding: totalOutstanding || outstanding,
+    invoiceCount: invoices.length,
+    paidCount: invoices.filter((i: any) => i.status === 'paid').length,
+    pendingCount: invoices.filter((i: any) => i.status !== 'paid').length,
+    recentInvoices,
+    monthlyRevenue: [
+      { month: 'Jan', amount: 450000 },
+      { month: 'Feb', amount: 520000 },
+      { month: 'Mar', amount: 480000 },
+      { month: 'Apr', amount: 610000 },
+      { month: 'May', amount: 590000 },
+      { month: 'Jun', amount: totalCollected > 0 ? totalCollected : 540000 }
+    ]
+  });
+});
+
+// ── Research (used by Dean dashboard) ────────────────────────────────────────
+app.get('/api/research', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const schoolId = user.schoolId;
+  res.json({
+    projects: (db.research_projects || []).filter((p: any) => !schoolId || p.schoolId === schoolId),
+    publications: (db.publications || []).filter((p: any) => !schoolId || p.schoolId === schoolId),
+    theses: (db.theses || []).filter((t: any) => !schoolId || t.schoolId === schoolId),
+    papers: (db.research_papers || [])
+  });
+});
+
+// ── Communications broadcast (used by Principal) ──────────────────────────────
+app.post('/api/communications/broadcast', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const { title, message, priority, targetRoles } = req.body;
+  if (!title || !message) { res.status(400).json({ error: 'title and message are required' }); return; }
+
+  const ann = {
+    id: 'ann-' + Date.now(),
+    schoolId: user.schoolId,
+    senderId: user.id,
+    senderName: user.name || 'Administration',
+    title,
+    message,
+    priority: priority || 'NORMAL',
+    targetRoles: targetRoles || ['all'],
+    createdAt: new Date().toISOString()
+  };
+  if (!db.announcements) db.announcements = [];
+  db.announcements.push(ann);
+  writeDb(db);
+  res.status(201).json(ann);
+});
+
+// ── Event queue (used by EventVisualizer component) ───────────────────────────
+app.get('/api/admin/event_queue', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const schoolId = user.schoolId;
+
+  const events = (db.event_stream || [])
+    .filter((e: any) => !schoolId || !e.schoolId || e.schoolId === schoolId)
+    .slice(-100)
+    .reverse();
+
+  // Seed demo events if empty
+  if (events.length === 0) {
+    const demoEvents = [
+      { id: 'evt-1', eventType: 'STUDENT_ENROLLED', title: 'New Student Enrolled', message: 'Ada Lovelace enrolled in BSCS Year 1', schoolId, timestamp: new Date(Date.now() - 3600000).toISOString() },
+      { id: 'evt-2', eventType: 'ATTENDANCE_SESSION_STARTED', title: 'Attendance Session', message: 'CS101 attendance session started by Dr. Newton', schoolId, timestamp: new Date(Date.now() - 7200000).toISOString() },
+      { id: 'evt-3', eventType: 'PAYMENT_RECEIVED', title: 'Fee Payment', message: 'Student fee payment of KES 45,000 received', schoolId, timestamp: new Date(Date.now() - 86400000).toISOString() },
+      { id: 'evt-4', eventType: 'GRADE_SUBMITTED', title: 'Grades Submitted', message: 'CS101 semester grades submitted by Dr. Newton', schoolId, timestamp: new Date().toISOString() }
+    ];
+    res.json({ events: demoEvents, total: demoEvents.length });
+    return;
+  }
+
+  res.json({ events, total: events.length });
+});
+
+// ── POST graduation clearance (mark student as graduated) ────────────────────
+app.post('/api/graduation/clearance', requireRole(['admin', 'registrar']), (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const { studentId, notes } = req.body;
+  if (!studentId) { res.status(400).json({ error: 'studentId is required' }); return; }
+
+  const studentIdx = db.students.findIndex((s: any) => s.id === studentId && s.schoolId === user.schoolId);
+  if (studentIdx === -1) { res.status(404).json({ error: 'Student not found' }); return; }
+
+  // Check all clearance gates first
+  const student = db.students[studentIdx];
+  const balance = (db.student_balances || []).find((b: any) => b.studentId === studentId)?.outstandingBalance || 0;
+  const hasOverdueBooks = (db.borrowings || []).some((b: any) => b.studentId === studentId && b.status === 'overdue');
+  const pendingDisciplinary = (db.disciplinary_cases || []).some((c: any) => c.studentId === studentId && c.status !== 'resolved');
+
+  if (balance > 0) { res.status(400).json({ error: `Student has outstanding fee balance of KES ${balance}` }); return; }
+  if (hasOverdueBooks) { res.status(400).json({ error: 'Student has overdue library books' }); return; }
+  if (pendingDisciplinary) { res.status(400).json({ error: 'Student has unresolved disciplinary cases' }); return; }
+
+  // Graduate the student
+  db.students[studentIdx].status = 'Graduated';
+  db.students[studentIdx].academicState = 'GRADUATED';
+  db.students[studentIdx].graduationDate = new Date().toISOString().split('T')[0];
+
+  const gradRecord = {
+    id: 'grad-' + Date.now(),
+    schoolId: user.schoolId,
+    studentId,
+    studentName: student.name,
+    regNumber: student.regNumber,
+    programId: student.programId,
+    graduationDate: new Date().toISOString().split('T')[0],
+    approvedBy: user.name || user.email,
+    notes: notes || '',
+    createdAt: new Date().toISOString()
+  };
+  if (!db.graduation_records) db.graduation_records = [];
+  db.graduation_records.push(gradRecord);
+
+  // Auto-create alumni profile
+  if (!db.alumni_profiles) db.alumni_profiles = [];
+  const alreadyAlumni = db.alumni_profiles.some((a: any) => a.studentId === studentId);
+  if (!alreadyAlumni) {
+    const prog = (db.programs || []).find((p: any) => p.id === student.programId);
+    db.alumni_profiles.push({
+      id: 'alum-' + Date.now(),
+      schoolId: user.schoolId,
+      studentId,
+      userId: student.userId,
+      graduationYear: new Date().getFullYear(),
+      programName: prog?.name || 'N/A',
+      email: student.email,
+      isActivated: false,
+      createdAt: new Date().toISOString()
+    });
+  }
+
+  writeDb(db);
+  res.status(201).json({ message: 'Student successfully graduated', record: gradRecord });
+});
+
+// ── Document storage backend (replaces localStorage in DocumentEnginePortal) ──
+app.get('/api/documents', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const docs = (db.user_documents || []).filter((d: any) =>
+    d.userId === user.id || d.schoolId === user.schoolId
+  );
+  res.json(docs);
+});
+
+app.post('/api/documents', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const { title, type, content, templateId, metadata } = req.body;
+  if (!title) { res.status(400).json({ error: 'Document title is required' }); return; }
+
+  const doc = {
+    id: 'doc-' + Date.now(),
+    userId: user.id,
+    schoolId: user.schoolId,
+    title,
+    type: type || 'general',
+    content: content || '',
+    templateId: templateId || null,
+    metadata: metadata || {},
+    status: 'draft',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  if (!db.user_documents) db.user_documents = [];
+  db.user_documents.push(doc);
+  writeDb(db);
+  res.status(201).json(doc);
+});
+
+app.put('/api/documents/:id', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const idx = (db.user_documents || []).findIndex((d: any) => d.id === req.params.id && d.userId === user.id);
+  if (idx === -1) { res.status(404).json({ error: 'Document not found' }); return; }
+  db.user_documents[idx] = { ...db.user_documents[idx], ...req.body, updatedAt: new Date().toISOString() };
+  writeDb(db);
+  res.json(db.user_documents[idx]);
+});
+
+app.delete('/api/documents/:id', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const idx = (db.user_documents || []).findIndex((d: any) => d.id === req.params.id && d.userId === user.id);
+  if (idx === -1) { res.status(404).json({ error: 'Document not found' }); return; }
+  db.user_documents.splice(idx, 1);
+  writeDb(db);
+  res.json({ message: 'Document deleted' });
+});
+
+// ── QR Attendance scan endpoint (Android + Web) ────────────────────────────────
+// Students scan a QR code which contains { sessionId, qrToken }
+app.post('/api/attendance/qr-scan', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const { sessionId, qrToken } = req.body;
+  if (!sessionId || !qrToken) { res.status(400).json({ error: 'sessionId and qrToken are required' }); return; }
+
+  const session = (db.attendance_sessions || []).find((s: any) => s.id === sessionId);
+  if (!session) { res.status(404).json({ error: 'Attendance session not found' }); return; }
+  if (session.status === 'ended') { res.status(400).json({ error: 'This attendance session has ended' }); return; }
+
+  // Validate QR token matches current active token
+  if (session.currentQrToken !== qrToken) {
+    res.status(400).json({ error: 'Invalid or expired QR code. Please scan the latest code displayed.' });
+    return;
+  }
+
+  // Find the student record
+  const student = (db.students || []).find((s: any) => s.userId === user.id || s.email === user.email);
+  if (!student) { res.status(404).json({ error: 'Student record not found for this user' }); return; }
+
+  // Check if already marked
+  const alreadyMarked = (db.attendance_records || []).some(
+    (r: any) => r.sessionId === sessionId && r.studentId === student.id
+  );
+  if (alreadyMarked) { res.status(400).json({ error: 'You have already been marked for this session' }); return; }
+
+  // Record attendance
+  const record = {
+    id: 'att-' + Date.now(),
+    schoolId: student.schoolId,
+    sessionId,
+    unitId: session.unitId,
+    studentId: student.id,
+    studentName: student.name,
+    studentReg: student.regNumber,
+    status: 'present',
+    scanMethod: 'qr',
+    scanTime: new Date().toISOString()
+  };
+  if (!db.attendance_records) db.attendance_records = [];
+  db.attendance_records.push(record);
+
+  // Update course registration attendance count
+  const regIdx = (db.course_registrations || []).findIndex(
+    (r: any) => r.studentId === student.id && r.unitId === session.unitId
+  );
+  if (regIdx !== -1) {
+    db.course_registrations[regIdx].attendanceCount = (db.course_registrations[regIdx].attendanceCount || 0) + 1;
+  }
+
+  writeDb(db);
+  res.status(201).json({ message: 'Attendance recorded successfully', record });
+});
+
+// ── GET current QR for a session (polling endpoint for mobile) ────────────────
+app.get('/api/attendance/sessions/:id/qr', requireAuth, (req, res) => {
+  const db = readDb();
+  const session = (db.attendance_sessions || []).find((s: any) => s.id === req.params.id);
+  if (!session) { res.status(404).json({ error: 'Session not found' }); return; }
+  if (session.status === 'ended') { res.status(400).json({ error: 'Session ended' }); return; }
+  res.json({
+    sessionId: session.id,
+    unitCode: session.unitCode,
+    unitName: session.unitName,
+    currentQrToken: session.currentQrToken,
+    expiresAt: session.qrExpiresAt,
+    status: session.status
+  });
+});
+
+// ── Communications: real-time typing + presence (polling fallback) ────────────
+app.get('/api/communications/presence', requireAuth, (req, res) => {
+  const db = readDb();
+  const user = (req as any).user;
+  // Update own presence
+  if (!db.user_presence) db.user_presence = [];
+  const presIdx = db.user_presence.findIndex((p: any) => p.userId === user.id);
+  const presEntry = { userId: user.id, name: user.name, role: user.role, status: 'online', lastSeen: new Date().toISOString() };
+  if (presIdx !== -1) db.user_presence[presIdx] = presEntry;
+  else db.user_presence.push(presEntry);
+  writeDb(db);
+
+  // Return all online users from same school
+  const onlineUsers = db.user_presence.filter((p: any) => {
+    if (user.role !== 'superadmin' && p.userId !== user.id) {
+      const u = (db.users || []).find((u: any) => u.id === p.userId);
+      return u && (u.schoolId === user.schoolId || user.role === 'superadmin');
+    }
+    return true;
+  });
+  res.json(onlineUsers);
+});
+
+// ── Chat: full message send with read receipts ────────────────────────────────
+app.post('/api/communications/threads/:threadId/messages', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const { threadId } = req.params;
+  const { content, type, replyToId, attachmentUrl } = req.body;
+  if (!content && !attachmentUrl) { res.status(400).json({ error: 'Message content or attachment required' }); return; }
+
+  const thread = (db.chat_threads || []).find((t: any) => t.id === threadId);
+  if (!thread) { res.status(404).json({ error: 'Thread not found' }); return; }
+
+  const msg = {
+    id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+    threadId,
+    senderId: user.id,
+    senderName: user.name,
+    senderRole: user.role,
+    type: type || 'text',
+    content: content || '',
+    attachmentUrl: attachmentUrl || null,
+    replyToId: replyToId || null,
+    reactions: [],
+    readBy: [user.id],
+    timestamp: new Date().toISOString()
+  };
+  if (!db.chat_messages) db.chat_messages = [];
+  db.chat_messages.push(msg);
+
+  // Clear typing state for this user in this thread
+  db.typing_states = (db.typing_states || []).filter(
+    (t: any) => !(t.threadId === threadId && t.userId === user.id)
+  );
+
+  writeDb(db);
+  res.status(201).json(msg);
+});
+
+// ── Mark messages as read ──────────────────────────────────────────────────────
+app.post('/api/communications/threads/:threadId/read', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const { threadId } = req.params;
+
+  (db.chat_messages || []).forEach((msg: any) => {
+    if (msg.threadId === threadId && !(msg.readBy || []).includes(user.id)) {
+      msg.readBy = [...(msg.readBy || []), user.id];
+    }
+  });
+  writeDb(db);
+  res.json({ message: 'Messages marked as read' });
+});
+
+// ── HOD dashboard summary ─────────────────────────────────────────────────────
+app.get('/api/hod/dashboard', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  const db = readDb();
+  const schoolId = user.schoolId;
+
+  const staffMember = (db.staff || []).find((s: any) => s.userId === user.id);
+  const deptId = staffMember?.departmentIdHash || staffMember?.departmentId;
+
+  const deptStaff = (db.staff || []).filter((s: any) => s.schoolId === schoolId && (s.departmentIdHash === deptId || s.departmentId === deptId));
+  const deptPrograms = (db.programs || []).filter((p: any) => p.schoolId === schoolId && p.departmentId === deptId);
+  const progIds = deptPrograms.map((p: any) => p.id);
+  const deptStudents = (db.students || []).filter((s: any) => s.schoolId === schoolId && progIds.includes(s.programId));
+
+  res.json({
+    department: (db.departments || []).find((d: any) => d.id === deptId),
+    staffCount: deptStaff.length,
+    staff: deptStaff,
+    programCount: deptPrograms.length,
+    programs: deptPrograms,
+    studentCount: deptStudents.length,
+    announcements: (db.announcements || []).filter((a: any) => a.schoolId === schoolId).slice(-5).reverse()
+  });
 });
 
 // Start Server

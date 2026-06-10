@@ -201,11 +201,11 @@ export default function RegistrarDashboard({ token, user, onLogout, appendLog }:
         )}
 
         {activeTab === 'communications' && (
-          <CommunicationsHub token={token} user={user} isPhoneFrame={false} />
+          <CommunicationsHub user={user} />
         )}
 
         {activeTab === 'profile' && (
-          <ProfilePage token={token} user={user} onBack={() => setActiveTab('dashboard')} />
+          <ProfilePage token={token} user={user} onLogout={onLogout} />
         )}
       </div>
     </div>

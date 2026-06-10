@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0f172a">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar_generic"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="#1e293b"
+        app:title="@string/app_name"
+        app:titleTextColor="#ffffff"/>
+
+    <!-- Header card -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#1e293b"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/tv_generic_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PORTAL"
+            android:textColor="#a855f7"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.15"/>
+
+        <TextView
+            android:id="@+id/tv_generic_welcome"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Welcome"
+            android:textColor="#ffffff"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginTop="2dp"/>
+
+        <TextView
+            android:id="@+id/tv_generic_sub"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Campus portal"
+            android:textColor="#94a3b8"
+            android:textSize="12sp"
+            android:layout_marginTop="2dp"/>
+    </LinearLayout>
+
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tab_layout_generic"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#0f172a"
+        app:tabTextColor="#64748b"
+        app:tabSelectedTextColor="#a855f7"
+        app:tabIndicatorColor="#a855f7"
+        app:tabMode="scrollable"/>
+
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/pager_generic"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"/>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_nav_generic"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1e293b"
+        app:itemIconTint="@color/bottom_nav_color"
+        app:itemTextColor="@color/bottom_nav_color"
+        app:menu="@menu/menu_generic"/>
+
+</LinearLayout>

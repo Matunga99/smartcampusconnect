@@ -16,13 +16,11 @@ import retrofit2.http.PUT;
 import retrofit2.http.Path;
 
 /**
- * Full Retrofit API interface matching every SmartCampusConnect X backend endpoint
- * used by the Android app across all roles: superadmin, admin, lecturer, student.
+ * Full Retrofit API interface — all SmartCampusConnect X endpoints.
  */
 public interface ApiService {
 
-    // ── Auth ─────────────────────────────────────────────────────────────────
-
+    // ── Auth ──────────────────────────────────────────────────────────────────
     @POST("api/auth/login")
     Call<AuthModels.LoginResponse> login(@Body AuthModels.LoginRequest request);
 
@@ -32,8 +30,12 @@ public interface ApiService {
     @GET("api/auth/me")
     Call<AuthModels.MeResponse> getMe(@Header("Authorization") String auth);
 
-    // ── Profile ───────────────────────────────────────────────────────────────
+    @POST("api/auth/change-password")
+    Call<DashboardModels.GenericResponse> changePassword(
+            @Header("Authorization") String auth,
+            @Body DashboardModels.ChangePasswordRequest request);
 
+    // ── Profile ───────────────────────────────────────────────────────────────
     @GET("api/profile/me")
     Call<ProfileModels.UserProfile> getProfile(@Header("Authorization") String auth);
 
@@ -43,7 +45,6 @@ public interface ApiService {
             @Body ProfileModels.UpdateProfileRequest request);
 
     // ── Student ───────────────────────────────────────────────────────────────
-
     @GET("api/student/dashboard")
     Call<DashboardModels.StudentDashboard> getStudentDashboard(@Header("Authorization") String auth);
 
@@ -56,16 +57,14 @@ public interface ApiService {
     @GET("api/admin/timetables")
     Call<List<DashboardModels.TimetableEntry>> getTimetables(@Header("Authorization") String auth);
 
-    // ── Student Finance ───────────────────────────────────────────────────────
-
+    // ── Finance ───────────────────────────────────────────────────────────────
     @GET("api/finance/invoices")
     Call<List<DashboardModels.Invoice>> getInvoices(@Header("Authorization") String auth);
 
-    @GET("api/finance/student-balances")
-    Call<List<DashboardModels.StudentBalance>> getStudentBalances(@Header("Authorization") String auth);
+    @GET("api/finance/summary")
+    Call<DashboardModels.FinanceSummary> getFinanceSummary(@Header("Authorization") String auth);
 
-    // ── Student Library ───────────────────────────────────────────────────────
-
+    // ── Library ───────────────────────────────────────────────────────────────
     @GET("api/library/books")
     Call<List<DashboardModels.Book>> getBooks(@Header("Authorization") String auth);
 
@@ -76,7 +75,6 @@ public interface ApiService {
     Call<List<DashboardModels.LibraryFine>> getLibraryFines(@Header("Authorization") String auth);
 
     // ── Announcements ─────────────────────────────────────────────────────────
-
     @GET("api/communications/announcements")
     Call<List<DashboardModels.Announcement>> getAnnouncements(@Header("Authorization") String auth);
 
@@ -85,8 +83,18 @@ public interface ApiService {
             @Header("Authorization") String auth,
             @Body DashboardModels.SendAnnouncementRequest request);
 
-    // ── Lecturer ──────────────────────────────────────────────────────────────
+    // ── Attendance QR scan ────────────────────────────────────────────────────
+    @POST("api/attendance/qr-scan")
+    Call<DashboardModels.GenericResponse> qrScan(
+            @Header("Authorization") String auth,
+            @Body DashboardModels.QrScanRequest request);
 
+    @GET("api/attendance/sessions/{id}/qr")
+    Call<DashboardModels.QrSessionData> getSessionQr(
+            @Header("Authorization") String auth,
+            @Path("id") String sessionId);
+
+    // ── Lecturer ──────────────────────────────────────────────────────────────
     @GET("api/lecturer/dashboard")
     Call<DashboardModels.LecturerDashboard> getLecturerDashboard(@Header("Authorization") String auth);
 
@@ -103,16 +111,15 @@ public interface ApiService {
             @Header("Authorization") String auth,
             @Body DashboardModels.GradeStudentRequest request);
 
-    // ── Admin ─────────────────────────────────────────────────────────────────
-
+    // ── Admin (scoped) ────────────────────────────────────────────────────────
     @GET("api/admin/dashboard")
     Call<DashboardModels.AdminDashboard> getAdminDashboard(@Header("Authorization") String auth);
 
     @GET("api/admin/students")
-    Call<List<DashboardModels.Student>> getStudents(@Header("Authorization") String auth);
+    Call<List<DashboardModels.Student>> getAdminStudents(@Header("Authorization") String auth);
 
     @GET("api/admin/staff")
-    Call<List<DashboardModels.Staff>> getStaff(@Header("Authorization") String auth);
+    Call<List<DashboardModels.Staff>> getAdminStaff(@Header("Authorization") String auth);
 
     @GET("api/admin/departments")
     Call<List<DashboardModels.Department>> getDepartments(@Header("Authorization") String auth);
@@ -132,15 +139,21 @@ public interface ApiService {
     @DELETE("api/admin/students/{id}")
     Call<DashboardModels.GenericResponse> deleteStudent(
             @Header("Authorization") String auth,
-            @Path("id") String studentId);
+            @Path("id") String id);
 
     @DELETE("api/admin/staff/{id}")
     Call<DashboardModels.GenericResponse> deleteStaff(
             @Header("Authorization") String auth,
-            @Path("id") String staffId);
+            @Path("id") String id);
+
+    // ── Shared short-path (multi-role) ────────────────────────────────────────
+    @GET("api/students")
+    Call<List<DashboardModels.Student>> getStudents(@Header("Authorization") String auth);
+
+    @GET("api/staff")
+    Call<List<DashboardModels.Staff>> getStaff(@Header("Authorization") String auth);
 
     // ── Super Admin ───────────────────────────────────────────────────────────
-
     @GET("api/super/stats")
     Call<DashboardModels.SuperStats> getSuperStats(@Header("Authorization") String auth);
 
@@ -151,4 +164,7 @@ public interface ApiService {
     Call<DashboardModels.GenericResponse> toggleSchool(
             @Header("Authorization") String auth,
             @Path("id") String schoolId);
+
+    @GET("api/super/admins")
+    Call<List<DashboardModels.AdminUser>> getAdmins(@Header("Authorization") String auth);
 }
